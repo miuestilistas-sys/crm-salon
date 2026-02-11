@@ -506,7 +506,7 @@ def sw():
     js = r"""
 self.addEventListener("install", (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open("crm-cache-v8").then((cache) => cache.addAll(["/"])));
+  e.waitUntil(caches.open("crm-cache-v9").then((cache) => cache.addAll(["/"])));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(self.clients.claim());
