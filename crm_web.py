@@ -165,27 +165,32 @@ HTML = r"""
 
     table { width:100%; border-collapse: collapse; overflow:hidden; border-radius: 12px; }
     th, td { border: 1px solid #e6e8f2; padding: 10px; text-align: center; vertical-align: middle; font-size: 14px; }
-    th { background:#d9ead3; font-size: 13px; position: sticky; top: 0; z-index: 2; }
+    th { background:#d9ead3; font-size: 13px; }
     td.comment { text-align:left; white-space: pre-wrap; }
     tr.due { background: #fff2cc; }
     tr:hover { outline: 2px solid rgba(37,99,235,.15); }
 
     /* columnas delgadas */
-    th.rem, td.rem { width: 58px; padding-left: 6px; padding-right: 6px; }
-    th.act, td.act { width: 58px; padding-left: 6px; padding-right: 6px; }
+    th.rem, td.rem { width: 62px; padding-left: 6px; padding-right: 6px; }
+    th.act, td.act { width: 62px; padding-left: 6px; padding-right: 6px; }
 
     /* checkbox verde */
     .chk { width: 22px; height: 22px; accent-color: #16a34a; cursor: pointer; }
     .chkWrap { display:flex; justify-content:center; align-items:center; }
 
-    /* contenedor con scroll para ver TODOS los registros */
-    .tableScroll { max-height: 65vh; overflow: auto; border-radius: 12px; }
+    /* ✅ Tabla scrolleable: para ver TODOS los registros */
+    .tableWrap {
+      overflow: auto;
+      max-height: 60vh;
+      border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
 
     @media (max-width: 820px){
       .grid, .grid3 { grid-template-columns: 1fr; }
       th, td { font-size: 13px; padding: 8px; }
-      th.rem, td.rem, th.act, td.act { width: 54px; }
-      .tableScroll { max-height: 60vh; }
+      th.rem, td.rem, th.act, td.act { width: 56px; }
+      .tableWrap { max-height: 55vh; }
     }
   </style>
 </head>
@@ -270,16 +275,17 @@ HTML = r"""
   <div class="card">
     <div class="row" style="justify-content:space-between;">
       <div style="flex:1; min-width:240px;">
-        <label>Filtrar por nombre</label>
-        <input id="q" placeholder="Escribe y luego presiona Buscar..." value="{{ q }}" autocomplete="off">
+        <label>Filtrar (en vivo)</label>
+        <!-- ✅ filtro sin recargar (ya no se traba en 1 letra) -->
+        <input id="q" placeholder="Escribe para filtrar..." autocomplete="off">
+        <div class="muted" style="margin-top:6px;">
+          Filtra por: nombre, teléfono, servicio o comentario.
+        </div>
       </div>
-
-      <button class="btn btn-primary" type="button" onclick="applyFilter()">🔎 Buscar</button>
-      <button class="btn btn-ghost" type="button" onclick="clearFilter()">✖ Limpiar filtro</button>
     </div>
 
-    <div class="tableScroll" style="margin-top:10px;">
-      <table>
+    <div class="tableWrap" style="margin-top:10px;">
+      <table id="crmTable">
         <thead>
           <tr>
             <th>NOMBRE</th>
@@ -293,9 +299,10 @@ HTML = r"""
           </tr>
         </thead>
 
-        <tbody>
+        <tbody id="crmBody">
           {% for r in rows %}
             <tr class="{{ r.row_class }}"
+                data-search="{{ (r.nombre ~ ' ' ~ r.telefono ~ ' ' ~ r.fecha ~ ' ' ~ r.retoque ~ ' ' ~ r.servicio ~ ' ' ~ r.comentario)|lower }}"
                 onclick='loadRow({{ r|tojson }})'
                 style="cursor:pointer;">
               <td><b>{{ r.nombre }}</b></td>
@@ -305,15 +312,16 @@ HTML = r"""
               <td>{{ r.servicio }}</td>
               <td class="comment">{{ r.comentario }}</td>
 
-              <!-- RECORDATORIO con confirm (FIX: guarda bien el check) -->
+              <!-- ✅ RECORDATORIO ARREGLADO -->
               <td class="rem" onclick="event.stopPropagation();">
                 <form method="post" action="/toggle_reminder" style="margin:0;" onclick="event.stopPropagation();">
                   <input type="hidden" name="id" value="{{ r.id }}">
-                  <input type="hidden" name="target" value="">
+                  <input type="hidden" name="target" value="{% if r.recordatorio %}0{% else %}1{% endif %}">
                   <div class="chkWrap">
                     <input class="chk" type="checkbox"
                            {% if r.recordatorio %}checked{% endif %}
-                           onclick="return onReminderClick(event, this);">
+                           onclick="event.stopPropagation();"
+                           onchange="confirmReminder(this);">
                   </div>
                 </form>
               </td>
@@ -423,63 +431,53 @@ HTML = r"""
     updateRetouch();
   }
 
-  function applyFilter(){
-    const q = document.getElementById("q").value;
-    const url = new URL(window.location.href);
-    if(q.trim()){
-      url.searchParams.set("q", q.trim());
-    } else {
-      url.searchParams.delete("q");
-    }
-    window.location.href = url.toString();
+  // ✅ filtro EN VIVO (sin recargar, ya no se traba en 1 letra)
+  function liveFilter(){
+    const q = (document.getElementById("q").value || "").trim().toLowerCase();
+    const rows = document.querySelectorAll("#crmBody tr[data-search]");
+    let any = false;
+    rows.forEach(tr => {
+      const hay = (tr.getAttribute("data-search") || "");
+      const show = !q || hay.includes(q);
+      tr.style.display = show ? "" : "none";
+      if(show) any = true;
+    });
+    // si no hay coincidencias, no rompe nada (solo oculta)
   }
 
-  function clearFilter(){
-    const url = new URL(window.location.href);
-    url.searchParams.delete("q");
-    window.location.href = url.toString();
-  }
-
-  // Enter en filtro = buscar
-  document.addEventListener("keydown", function(e){
-    const q = document.getElementById("q");
-    if(e.key === "Enter" && document.activeElement === q){
-      e.preventDefault();
-      applyFilter();
-    }
-  });
-
-  // FIX checkbox: no deja que cambie solo, pregunta y recién guarda
-  function onReminderClick(ev, chk){
-    ev.stopPropagation();
-    ev.preventDefault();
-
+  // ✅ checkbox: arreglado (antes el hidden "target" quedaba viejo)
+  function confirmReminder(chk){
     const form = chk.closest("form");
-    const targetInput = form.querySelector('input[name="target"]');
+    const hiddenTarget = form.querySelector('input[name="target"]');
 
-    const current = chk.checked;
-    const desired = !current;
+    // lo que el usuario quiere (después del click)
+    const want = chk.checked ? "1" : "0";
+    hiddenTarget.value = want;
 
-    const msg = desired
-      ? "¿Se le envió recordatorio?\n\nOK = Sí / Cancelar = No"
-      : "¿Quitar la marca de recordatorio?\n\nOK = Sí / Cancelar = No";
+    const msg = (want === "1")
+      ? "¿Se le envió recordatorio?\n\nSí = guardar marca"
+      : "¿Quitar marca de recordatorio?\n\nSí = quitar";
 
     const ok = confirm(msg);
     if(ok){
-      chk.checked = desired;
-      targetInput.value = desired ? "1" : "0";
       form.submit();
+    } else {
+      // revierte visual y target
+      chk.checked = !chk.checked;
+      hiddenTarget.value = chk.checked ? "1" : "0";
     }
-    return false;
   }
 
+  document.getElementById("q").addEventListener("input", liveFilter);
   document.getElementById("fecha_picker").addEventListener("change", syncHiddenFromPicker);
   document.getElementById("servicio").addEventListener("change", updateRetouch);
 
   syncHiddenFromPicker();
+  liveFilter();
 
+  // ✅ PWA: service worker SIN CACHE (borra caches viejos)
   if ("serviceWorker" in navigator) {
-navigator.serviceWorker.register("/sw.js?v=9")
+    navigator.serviceWorker.register("/sw.js?v=12").catch(()=>{});
   }
 </script>
 </body>
@@ -503,16 +501,22 @@ def manifest():
 
 @APP.get("/sw.js")
 def sw():
+    # ✅ NO CACHE: siempre red + borra caches viejos
     js = r"""
 self.addEventListener("install", (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open("crm-cache-V10").then((cache) => cache.addAll(["?v/10"])));
 });
 self.addEventListener("activate", (e) => {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil((async () => {
+    try{
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }catch(e){}
+    await self.clients.claim();
+  })());
 });
 self.addEventListener("fetch", (e) => {
-  e.respondWith(caches.match(e.request).then((r) => r || fetch(e.request)));
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
 """
     return Response(js, mimetype="application/javascript")
@@ -521,16 +525,11 @@ self.addEventListener("fetch", (e) => {
 @APP.get("/")
 def index():
     data = load_data()
-    q_raw = request.args.get("q", "")
-    q = (q_raw or "").strip().lower()
 
     rows = []
     nearest = None
 
     for r in data:
-        if q and q not in r["nombre"].lower():
-            continue
-
         retoque = ""
         due = False
         try:
@@ -570,7 +569,6 @@ def index():
         services=SERVICES,
         today_iso=today_iso,
         today_ddmmyyyy=today_ddmmyyyy,
-        q=q_raw,
         banner=banner,
         error=error,
         can_undo=can_undo,
@@ -596,8 +594,8 @@ def save():
     if rid:
         found = False
         for r in data:
-            if str(r.get("id")) == str(rid):  # FIX: comparación segura
-                rec = bool(r.get("recordatorio", False))  # mantener estado del check
+            if r["id"] == rid:
+                rec = bool(r.get("recordatorio", False))
                 r.update(
                     {
                         "nombre": nombre,
@@ -646,7 +644,7 @@ def delete():
     before = deepcopy(data)
 
     rid = (request.form.get("id") or "").strip()
-    data = [r for r in data if str(r.get("id")) != str(rid)]
+    data = [r for r in data if r.get("id") != rid]
 
     push_undo_snapshot(before)
     save_data(data)
@@ -663,7 +661,7 @@ def toggle_reminder():
     want = True if target == "1" else False
 
     for r in data:
-        if str(r.get("id")) == str(rid):
+        if r.get("id") == rid:
             r["recordatorio"] = want
             break
 
@@ -681,7 +679,7 @@ def undo():
     return redirect("/")
 
 
-# ---------- Export Excel (mismo archivo) ----------
+# ---------- Export Excel ----------
 def build_export_excel(path: str, data: list):
     if os.path.exists(path):
         try:
