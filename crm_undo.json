@@ -1,0 +1,919 @@
+{
+  "stack": [
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": true
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": true
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": true
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": true
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": true
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": true
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "da77ac8d-bb00-4a86-8c36-676bef4c6004",
+        "nombre": "Lucia padilla",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "da77ac8d-bb00-4a86-8c36-676bef4c6004",
+        "nombre": "Lucia padilla",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": true
+      }
+    ],
+    [
+      {
+        "id": "85d39753-00a1-4bcb-94eb-195f625ae8f9",
+        "nombre": "Rosa soto",
+        "telefono": "971012160",
+        "fecha": "10/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se le retoco despues de 3 sesiones desconocidas, se encontrk la zona manchada y restos de pigmento mineral.se apli o brown 1 tecnica powder brows",
+        "recordatorio": false
+      },
+      {
+        "id": "08f8d3c6-7fd9-4ffc-a6fb-bce96e1ad30e",
+        "nombre": "Julia Coral",
+        "telefono": "968378398",
+        "fecha": "09/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Brown1 viene de provincia",
+        "recordatorio": false
+      },
+      {
+        "id": "4ede9dc5-3270-4058-9653-adc1fbdea4dd",
+        "nombre": "Maria ramirez",
+        "telefono": "962168218",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Se cobro 300",
+        "recordatorio": false
+      },
+      {
+        "id": "e986c4dc-5dd7-43c8-8e8f-235af42e644f",
+        "nombre": "Rous",
+        "telefono": "955449231",
+        "fecha": "04/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "Pago 2000",
+        "recordatorio": false
+      },
+      {
+        "id": "4bba5592-cb9a-4409-a215-d97221bb0ad2",
+        "nombre": "Romina damn",
+        "telefono": "",
+        "fecha": "30/01/2026",
+        "servicio": "DELINEADO DE OJOS",
+        "comentario": "Se uso black",
+        "recordatorio": false
+      },
+      {
+        "id": "22042672-20cb-4f3c-afc2-ef25be45175f",
+        "nombre": "Rossana cornejo",
+        "telefono": "991672951",
+        "fecha": "22/01/2026",
+        "servicio": "LABIOS",
+        "comentario": "500",
+        "recordatorio": false
+      },
+      {
+        "id": "d0809a46-35c1-47e4-b9df-9c010793dbfb",
+        "nombre": "Mayuri Romero",
+        "telefono": "964903641",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "bdcce13d-69a1-4934-b6e1-58d3425e5088",
+        "nombre": "Katerine Alvarado",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      },
+      {
+        "id": "da77ac8d-bb00-4a86-8c36-676bef4c6004",
+        "nombre": "Lucia padilla",
+        "telefono": "924801663",
+        "fecha": "05/02/2026",
+        "servicio": "CEJAS",
+        "comentario": "300",
+        "recordatorio": false
+      }
+    ]
+  ]
+}
