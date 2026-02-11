@@ -31,16 +31,20 @@ COLUMNS_XLSX = ["NOMBRE", "TELEFONO", "FECHA", "FECHA RETOQUE", "SERVICIO", "COM
 def parse_ddmmyyyy(s: str):
     return datetime.strptime(s.strip(), "%d/%m/%Y")
 
+
 def fmt_ddmmyyyy(dt: datetime):
     return dt.strftime("%d/%m/%Y")
 
+
 def is_retouch_service(service: str) -> bool:
     return service.strip().upper() == "RETOQUE"
+
 
 def compute_retouch_date(fecha_str: str, service: str) -> str:
     dt = parse_ddmmyyyy(fecha_str)
     days = 365 if is_retouch_service(service) else 20
     return fmt_ddmmyyyy(dt + timedelta(days=days))
+
 
 def is_due(retouch_str: str) -> bool:
     try:
@@ -59,18 +63,21 @@ def load_data():
             data = json.load(f)
         out = []
         for r in data:
-            out.append({
-                "id": r.get("id") or str(uuid.uuid4()),
-                "nombre": (r.get("nombre") or "").strip(),
-                "telefono": (r.get("telefono") or "").strip(),
-                "fecha": (r.get("fecha") or "").strip(),  # dd/mm/yyyy
-                "servicio": (r.get("servicio") or "").strip(),
-                "comentario": (r.get("comentario") or "").strip(),
-                "recordatorio": bool(r.get("recordatorio", False)),
-            })
+            out.append(
+                {
+                    "id": r.get("id") or str(uuid.uuid4()),
+                    "nombre": (r.get("nombre") or "").strip(),
+                    "telefono": (r.get("telefono") or "").strip(),
+                    "fecha": (r.get("fecha") or "").strip(),  # dd/mm/yyyy
+                    "servicio": (r.get("servicio") or "").strip(),
+                    "comentario": (r.get("comentario") or "").strip(),
+                    "recordatorio": bool(r.get("recordatorio", False)),
+                }
+            )
         return out
     except Exception:
         return []
+
 
 def save_data(rows):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -89,15 +96,18 @@ def load_undo_stack():
     except Exception:
         return []
 
+
 def save_undo_stack(stack):
     stack = stack[-UNDO_MAX:]
     with open(UNDO_FILE, "w", encoding="utf-8") as f:
         json.dump({"stack": stack}, f, ensure_ascii=False, indent=2)
 
+
 def push_undo_snapshot(before_rows):
     stack = load_undo_stack()
     stack.append(before_rows)
     save_undo_stack(stack)
+
 
 def pop_undo_snapshot():
     stack = load_undo_stack()
@@ -155,23 +165,27 @@ HTML = r"""
 
     table { width:100%; border-collapse: collapse; overflow:hidden; border-radius: 12px; }
     th, td { border: 1px solid #e6e8f2; padding: 10px; text-align: center; vertical-align: middle; font-size: 14px; }
-    th { background:#d9ead3; font-size: 13px; }
+    th { background:#d9ead3; font-size: 13px; position: sticky; top: 0; z-index: 2; }
     td.comment { text-align:left; white-space: pre-wrap; }
     tr.due { background: #fff2cc; }
     tr:hover { outline: 2px solid rgba(37,99,235,.15); }
 
     /* columnas delgadas */
-    th.rem, td.rem { width: 62px; padding-left: 6px; padding-right: 6px; }
-    th.act, td.act { width: 62px; padding-left: 6px; padding-right: 6px; }
+    th.rem, td.rem { width: 58px; padding-left: 6px; padding-right: 6px; }
+    th.act, td.act { width: 58px; padding-left: 6px; padding-right: 6px; }
 
     /* checkbox verde */
     .chk { width: 22px; height: 22px; accent-color: #16a34a; cursor: pointer; }
     .chkWrap { display:flex; justify-content:center; align-items:center; }
 
+    /* contenedor con scroll para ver TODOS los registros */
+    .tableScroll { max-height: 65vh; overflow: auto; border-radius: 12px; }
+
     @media (max-width: 820px){
       .grid, .grid3 { grid-template-columns: 1fr; }
       th, td { font-size: 13px; padding: 8px; }
-      th.rem, td.rem, th.act, td.act { width: 56px; }
+      th.rem, td.rem, th.act, td.act { width: 54px; }
+      .tableScroll { max-height: 60vh; }
     }
   </style>
 </head>
@@ -257,11 +271,14 @@ HTML = r"""
     <div class="row" style="justify-content:space-between;">
       <div style="flex:1; min-width:240px;">
         <label>Filtrar por nombre</label>
-        <input id="q" placeholder="Escribe para filtrar..." value="{{ q }}" oninput="applyFilter()" autocomplete="off">
+        <input id="q" placeholder="Escribe y luego presiona Buscar..." value="{{ q }}" autocomplete="off">
       </div>
+
+      <button class="btn btn-primary" type="button" onclick="applyFilter()">🔎 Buscar</button>
+      <button class="btn btn-ghost" type="button" onclick="clearFilter()">✖ Limpiar filtro</button>
     </div>
 
-    <div style="overflow:auto; margin-top:10px;">
+    <div class="tableScroll" style="margin-top:10px;">
       <table>
         <thead>
           <tr>
@@ -288,16 +305,15 @@ HTML = r"""
               <td>{{ r.servicio }}</td>
               <td class="comment">{{ r.comentario }}</td>
 
-              <!-- RECORDATORIO con confirm -->
+              <!-- RECORDATORIO con confirm (FIX: guarda bien el check) -->
               <td class="rem" onclick="event.stopPropagation();">
                 <form method="post" action="/toggle_reminder" style="margin:0;" onclick="event.stopPropagation();">
                   <input type="hidden" name="id" value="{{ r.id }}">
-                  <input type="hidden" name="target" value="{% if r.recordatorio %}0{% else %}1{% endif %}">
+                  <input type="hidden" name="target" value="">
                   <div class="chkWrap">
                     <input class="chk" type="checkbox"
                            {% if r.recordatorio %}checked{% endif %}
-                           onclick="event.stopPropagation();"
-                           onchange="confirmReminder(this);">
+                           onclick="return onReminderClick(event, this);">
                   </div>
                 </form>
               </td>
@@ -418,19 +434,43 @@ HTML = r"""
     window.location.href = url.toString();
   }
 
-  function confirmReminder(chk){
+  function clearFilter(){
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.location.href = url.toString();
+  }
+
+  // Enter en filtro = buscar
+  document.addEventListener("keydown", function(e){
+    const q = document.getElementById("q");
+    if(e.key === "Enter" && document.activeElement === q){
+      e.preventDefault();
+      applyFilter();
+    }
+  });
+
+  // FIX checkbox: no deja que cambie solo, pregunta y recién guarda
+  function onReminderClick(ev, chk){
+    ev.stopPropagation();
+    ev.preventDefault();
+
     const form = chk.closest("form");
-    const target = form.querySelector('input[name="target"]').value; // 1=marcar, 0=desmarcar
-    const msg = (target === "1")
-      ? "¿Se le envió recordatorio?\n\nMarcar: Sí / No"
-      : "¿Quitar marca de recordatorio?\n\nMarcar: Sí / No";
+    const targetInput = form.querySelector('input[name="target"]');
+
+    const current = chk.checked;
+    const desired = !current;
+
+    const msg = desired
+      ? "¿Se le envió recordatorio?\n\nOK = Sí / Cancelar = No"
+      : "¿Quitar la marca de recordatorio?\n\nOK = Sí / Cancelar = No";
 
     const ok = confirm(msg);
     if(ok){
+      chk.checked = desired;
+      targetInput.value = desired ? "1" : "0";
       form.submit();
-    } else {
-      chk.checked = !chk.checked; // revierte
     }
+    return false;
   }
 
   document.getElementById("fecha_picker").addEventListener("change", syncHiddenFromPicker);
@@ -456,9 +496,10 @@ def manifest():
         "display": "fullscreen",
         "background_color": "#f6f7fb",
         "theme_color": "#2563eb",
-        "icons": []
+        "icons": [],
     }
     return Response(json.dumps(m), mimetype="application/manifest+json")
+
 
 @APP.get("/sw.js")
 def sw():
@@ -555,38 +596,44 @@ def save():
     if rid:
         found = False
         for r in data:
-            if r["id"] == rid:
-                rec = bool(r.get("recordatorio", False))
-                r.update({
+            if str(r.get("id")) == str(rid):  # FIX: comparación segura
+                rec = bool(r.get("recordatorio", False))  # mantener estado del check
+                r.update(
+                    {
+                        "nombre": nombre,
+                        "telefono": telefono,
+                        "fecha": fecha,
+                        "servicio": servicio,
+                        "comentario": comentario,
+                        "recordatorio": rec,
+                    }
+                )
+                found = True
+                break
+        if not found:
+            data.append(
+                {
+                    "id": rid,
                     "nombre": nombre,
                     "telefono": telefono,
                     "fecha": fecha,
                     "servicio": servicio,
                     "comentario": comentario,
-                    "recordatorio": rec
-                })
-                found = True
-                break
-        if not found:
-            data.append({
-                "id": rid,
+                    "recordatorio": False,
+                }
+            )
+    else:
+        data.append(
+            {
+                "id": str(uuid.uuid4()),
                 "nombre": nombre,
                 "telefono": telefono,
                 "fecha": fecha,
                 "servicio": servicio,
                 "comentario": comentario,
-                "recordatorio": False
-            })
-    else:
-        data.append({
-            "id": str(uuid.uuid4()),
-            "nombre": nombre,
-            "telefono": telefono,
-            "fecha": fecha,
-            "servicio": servicio,
-            "comentario": comentario,
-            "recordatorio": False
-        })
+                "recordatorio": False,
+            }
+        )
 
     push_undo_snapshot(before)
     save_data(data)
@@ -599,7 +646,7 @@ def delete():
     before = deepcopy(data)
 
     rid = (request.form.get("id") or "").strip()
-    data = [r for r in data if r.get("id") != rid]
+    data = [r for r in data if str(r.get("id")) != str(rid)]
 
     push_undo_snapshot(before)
     save_data(data)
@@ -616,7 +663,7 @@ def toggle_reminder():
     want = True if target == "1" else False
 
     for r in data:
-        if r.get("id") == rid:
+        if str(r.get("id")) == str(rid):
             r["recordatorio"] = want
             break
 
@@ -702,6 +749,7 @@ def build_export_excel(path: str, data: list):
             wb.remove(sh)
 
     wb.save(path)
+
 
 @APP.get("/export")
 def export():
