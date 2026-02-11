@@ -479,7 +479,7 @@ HTML = r"""
   syncHiddenFromPicker();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(()=>{});
+navigator.serviceWorker.register("/sw.js?v=9")
   }
 </script>
 </body>
@@ -506,7 +506,7 @@ def sw():
     js = r"""
 self.addEventListener("install", (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open("crm-cache-v9").then((cache) => cache.addAll(["/"])));
+  e.waitUntil(caches.open("crm-cache-V10").then((cache) => cache.addAll(["?v/10"])));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(self.clients.claim());
