@@ -56,11 +56,13 @@ def is_due(retouch_str: str) -> bool:
 
 
 # ---------- Supabase client ----------
-def get_sb() -> Client:
-    url = os.environ.get("SUPABASE_URL", "").strip()
-    key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+def get_sb():
+    url = (os.environ.get("SUPABASE_URL") or "").strip()
+    key = (os.environ.get("SUPABASE_ANON_KEY") or "").strip()
+
     if not url or not key:
-        raise RuntimeError("Falta SUPABASE_URL o SUPABASE_ANON_KEY en Environment Variables (Render).")
+        raise RuntimeError("Faltan variables SUPABASE_URL o SUPABASE_ANON_KEY en Render.")
+
     return create_client(url, key)
 
 
