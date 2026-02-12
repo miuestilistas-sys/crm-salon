@@ -1,30 +1,15 @@
-import json
 import os
 import uuid
-from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
-from flask import Flask, request, redirect, send_file, render_template_string, Response
-
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-
-# ---------------- SUPABASE ----------------
+from flask import Flask, request, redirect, Response, render_template_string
 from supabase import create_client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise Exception("Faltan variables SUPABASE_URL o SUPABASE_ANON_KEY en Render")
-
-SUPABASE = create_client(SUPABASE_URL, SUPABASE_KEY)
-# -----------------------------------------
-
-APP = Flask(__name__)
-
-EXPORT_FILE = "crm_export.xlsx"
-UNDO_MAX = 30  # historial tipo Ctrl+Z (en Supabase)
+# =========================
+# CONFIG
+# =========================
+CRM_TABLE = os.environ.get("CRM_TABLE", "crm_records")
+RETOQUE_DAYS = int(os.environ.get("RETOQUE_DAYS", "30"))
 
 SERVICES = [
     "CEJAS",
@@ -35,753 +20,269 @@ SERVICES = [
     "RETOQUE",
 ]
 
-COLUMNS_XLSX = ["NOMBRE", "TELEFONO", "FECHA", "FECHA RETOQUE", "SERVICIO", "COMENTARIO"]
+# =========================
+# SUPABASE (SIEMPRE DEFINIDO)
+# =========================
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
 
-CRM_TABLE = "crm_records"
-UNDO_TABLE = "crm_undo_snapshots"  # la creamos también (opcional pero recomendado)
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise Exception("Faltan variables SUPABASE_URL o SUPABASE_ANON_KEY en Render")
 
+SUPABASE = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------- fechas ----------
-def parse_ddmmyyyy(s: str):
-    return datetime.strptime(s.strip(), "%d/%m/%Y")
+APP = Flask(_name_)
 
-def fmt_ddmmyyyy(dt: datetime):
-    return dt.strftime("%d/%m/%Y")
-
-def is_retouch_service(service: str) -> bool:
-    return service.strip().upper() == "RETOQUE"
-
-def compute_retouch_date(fecha_str: str, service: str) -> str:
-    dt = parse_ddmmyyyy(fecha_str)
-    days = 365 if is_retouch_service(service) else 20
-    return fmt_ddmmyyyy(dt + timedelta(days=days))
-
-def is_due(retouch_str: str) -> bool:
-    try:
-        r = parse_ddmmyyyy(retouch_str).date()
-        return r <= datetime.now().date()
-    except Exception:
-        return False
-
-
-# ---------- Supabase client ----------
-def get_sb():
-    url = (os.environ.get("SUPABASE_URL") or "").strip()
-    key = (os.environ.get("SUPABASE_ANON_KEY") or "").strip()
-
-    if not url or not key:
-        raise RuntimeError("Faltan variables SUPABASE_URL o SUPABASE_ANON_KEY en Render.")
-
-    return create_client(url, key)
-
-
-# ---------- persistencia (Supabase) ----------
-def load_data(q: str = ""):
-    sb = get_sb()
-    q = (q or "").strip()
-
-    # Traemos todo (ordenado), y filtramos por nombre si hay q (más simple y estable)
-    resp = sb.table(CRM_TABLE).select("*").order("created_at", desc=True).execute()
-    rows = resp.data or []
-
-    out = []
-    for r in rows:
-        out.append({
-            "id": str(r.get("id") or ""),
-            "nombre": (r.get("nombre") or "").strip(),
-            "telefono": (r.get("telefono") or "").strip(),
-            "fecha": (r.get("fecha") or "").strip(),
-            "servicio": (r.get("servicio") or "").strip(),
-            "comentario": (r.get("comentario") or "").strip(),
-            "recordatorio": bool(r.get("recordatorio", False)),
-            "created_at": r.get("created_at"),
-        })
-
-    if q:
-        ql = q.lower()
-        out = [r for r in out if ql in (r["nombre"] or "").lower()]
-
-    return out
-
-
-def push_undo_snapshot(before_rows):
-    """
-    Guarda snapshot en tabla UNDO_TABLE para Deshacer.
-    Si no existe la tabla, simplemente no rompe (solo deshabilita undo).
-    """
-    try:
-        sb = get_sb()
-        sb.table(UNDO_TABLE).insert({
-            "snapshot": before_rows
-        }).execute()
-
-        # Mantener solo los últimos UNDO_MAX
-        resp = sb.table(UNDO_TABLE).select("id").order("id", desc=True).execute()
-        ids = [r["id"] for r in (resp.data or [])]
-        if len(ids) > UNDO_MAX:
-            to_delete = ids[UNDO_MAX:]
-            sb.table(UNDO_TABLE).delete().in_("id", to_delete).execute()
-    except Exception:
-        pass
-
-
-def can_undo():
-    try:
-        sb = get_sb()
-        resp = sb.table(UNDO_TABLE).select("id").order("id", desc=True).limit(1).execute()
-        return bool(resp.data)
-    except Exception:
-        return False
-
-
-def pop_undo_snapshot():
-    try:
-        sb = get_sb()
-        resp = sb.table(UNDO_TABLE).select("*").order("id", desc=True).limit(1).execute()
-        if not resp.data:
-            return None
-        row = resp.data[0]
-        sid = row["id"]
-        snap = row.get("snapshot")
-        sb.table(UNDO_TABLE).delete().eq("id", sid).execute()
-        return snap
-    except Exception:
+# =========================
+# HELPERS
+# =========================
+def parse_date_any(s: str) -> date | None:
+    """Acepta 'YYYY-MM-DD' o 'DD/MM/YYYY' """
+    if not s:
         return None
-
-
-def save_row_upsert(rid, nombre, telefono, fecha, servicio, comentario, recordatorio=False):
-    sb = get_sb()
-    payload = {
-        "id": rid,
-        "nombre": nombre,
-        "telefono": telefono,
-        "fecha": fecha,
-        "servicio": servicio,
-        "comentario": comentario,
-        "recordatorio": bool(recordatorio),
-    }
-    sb.table(CRM_TABLE).upsert(payload).execute()
-
-
-def delete_row(rid):
-    sb = get_sb()
-    sb.table(CRM_TABLE).delete().eq("id", rid).execute()
-
-
-def set_recordatorio(rid, want: bool):
-    sb = get_sb()
-    sb.table(CRM_TABLE).update({"recordatorio": bool(want)}).eq("id", rid).execute()
-
-
-def replace_all_rows(rows):
-    """
-    Restaura todo a un snapshot (para Undo).
-    """
-    sb = get_sb()
-    # Borra todo
-    sb.table(CRM_TABLE).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-
-    # Inserta todo
-    if rows:
-        ins = []
-        for r in rows:
-            ins.append({
-                "id": r.get("id") or str(uuid.uuid4()),
-                "nombre": r.get("nombre", ""),
-                "telefono": r.get("telefono", ""),
-                "fecha": r.get("fecha", ""),
-                "servicio": r.get("servicio", ""),
-                "comentario": r.get("comentario", ""),
-                "recordatorio": bool(r.get("recordatorio", False)),
-            })
-        sb.table(CRM_TABLE).insert(ins).execute()
-
-
-# ---------- validación ----------
-def validate_row(nombre, fecha, servicio):
-    if not nombre:
-        return "El nombre es obligatorio."
-    try:
-        parse_ddmmyyyy(fecha)
-    except Exception:
-        return "Fecha inválida (selecciona una fecha del calendario)."
-    if not servicio:
-        return "El servicio es obligatorio."
+    s = s.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            pass
     return None
 
+def iso_date(d: date | None) -> str | None:
+    return d.isoformat() if d else None
 
-HTML = r"""
+def calc_fecha_retoque(servicio: str, fecha_base: date | None, fecha_retoque_input: date | None) -> date | None:
+    """
+    Reglas:
+    - Si viene fecha_retoque manual -> se respeta
+    - Si servicio == 'RETOQUE' y no viene fecha_retoque -> usa la misma fecha
+    - Si NO es 'RETOQUE' -> fecha + RETOQUE_DAYS
+    """
+    if fecha_retoque_input:
+        return fecha_retoque_input
+
+    if not fecha_base:
+        return None
+
+    if (servicio or "").upper() == "RETOQUE":
+        return fecha_base
+
+    return fecha_base + timedelta(days=RETOQUE_DAYS)
+
+def safe_str(x) -> str:
+    return (x or "").strip()
+
+def fetch_rows():
+    # Orden por created_at si existe; si no, por fecha desc
+    # (si tu tabla no tiene created_at, igual funciona: Supabase ignora order si columna no existe? a veces falla)
+    # Mejor: intentamos created_at y si falla, intentamos fecha.
+    try:
+        res = SUPABASE.table(CRM_TABLE).select("*").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception:
+        res = SUPABASE.table(CRM_TABLE).select("*").order("fecha", desc=True).execute()
+        return res.data or []
+
+# =========================
+# UI
+# =========================
+HTML = """
 <!doctype html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <meta name="theme-color" content="#2563eb"/>
+  <meta charset="utf-8" />
   <title>CRM Salón</title>
-
   <style>
-    body { font-family: Arial, sans-serif; margin: 14px; background:#f6f7fb; }
-    .wrap { max-width: 1100px; margin: 0 auto; }
-    .card { background: white; border-radius: 14px; padding: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.06); margin-bottom: 12px; }
-    h1 { margin: 0 0 10px 0; font-size: 20px; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .grid3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-    label { font-size: 12px; color: #333; }
-    input, select, textarea { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #d9dbe7; font-size: 14px; background:#fff; }
-    textarea { min-height: 70px; resize: vertical; }
-    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
-    .btn { padding: 10px 12px; border-radius: 10px; border: 0; cursor:pointer; font-weight:700; text-decoration:none; display:inline-block; }
-    .btn-primary { background:#2563eb; color:#fff; }
-    .btn-danger { background:#ef4444; color:#fff; }
-    .btn-ghost { background:#eef2ff; }
-    .btn-ok { background:#16a34a; color:#fff; }
-    .btn-warn { background:#f59e0b; color:#111827; }
-    .btn-dark { background:#111827; color:#fff; }
-    .muted { color:#555; font-size: 13px; }
-    .banner { font-weight: 800; font-size: 14px; }
-    .error { color:#b91c1c; font-weight:700; }
-
-    table { width:100%; border-collapse: collapse; overflow:hidden; border-radius: 12px; }
-    th, td { border: 1px solid #e6e8f2; padding: 10px; text-align: center; vertical-align: middle; font-size: 14px; }
-    th { background:#d9ead3; font-size: 13px; }
-    td.comment { text-align:left; white-space: pre-wrap; }
-    tr.due { background: #fff2cc; }
-    tr:hover { outline: 2px solid rgba(37,99,235,.15); }
-
-    th.rem, td.rem { width: 62px; padding-left: 6px; padding-right: 6px; }
-    th.act, td.act { width: 62px; padding-left: 6px; padding-right: 6px; }
-
-    .chk { width: 22px; height: 22px; accent-color: #16a34a; cursor: pointer; }
-    .chkWrap { display:flex; justify-content:center; align-items:center; }
-
-    /* ✅ Scroll de tabla para ver TODOS */
-    .tableWrap{
-      overflow:auto;
-      max-height: 58vh;
-      -webkit-overflow-scrolling: touch;
-      margin-top:10px;
-      border-radius: 12px;
-    }
-
-    @media (max-width: 820px){
-      .grid, .grid3 { grid-template-columns: 1fr; }
-      th, td { font-size: 13px; padding: 8px; }
-      th.rem, td.rem, th.act, td.act { width: 56px; }
-      .tableWrap{ max-height: 52vh; }
-    }
+    body{font-family:Arial, sans-serif; margin:24px;}
+    .row{display:flex; gap:12px; flex-wrap:wrap;}
+    input, select, textarea{padding:8px; font-size:14px; width:260px;}
+    textarea{width:540px; height:70px;}
+    button{padding:10px 14px; font-weight:700; cursor:pointer;}
+    table{border-collapse:collapse; width:100%; margin-top:16px;}
+    th, td{border:1px solid #ddd; padding:8px; font-size:13px;}
+    th{background:#f4f4f4; position:sticky; top:0;}
+    .msg{margin:10px 0; color:#b00020; font-weight:700;}
+    .ok{color:#0a7b2e;}
+    .small{font-size:12px; color:#666;}
   </style>
 </head>
-
 <body>
-<div class="wrap">
+  <h2>CRM Salón</h2>
 
-  <div class="card">
-    <h1>CRM Salón</h1>
+  {% if msg %}
+    <div class="msg">{{ msg }}</div>
+  {% endif %}
 
-    <div class="row" style="justify-content:space-between;">
-      <div class="banner">
-        {{ banner }}
-        <br><span class="muted">Tip: toca una fila para cargarla arriba y editarla.</span>
+  <form method="post" action="/save">
+    <input type="hidden" name="id" value="{{ editing.get('id','') }}">
+    <div class="row">
+      <div>
+        <div class="small">Nombre</div>
+        <input name="nombre" value="{{ editing.get('nombre','') }}" placeholder="Nombre" required>
       </div>
-      <button class="btn btn-dark" type="button" onclick="goFullscreen()">⛶ Pantalla completa</button>
-    </div>
-
-    {% if error %}
-      <p class="error">⚠️ {{ error }}</p>
-    {% endif %}
-  </div>
-
-  <div class="card">
-    <form method="post" action="/save" id="mainForm" autocomplete="off">
-      <input type="hidden" name="id" id="rid" value="">
-
-      <div class="grid">
-        <div>
-          <label>NOMBRE</label>
-          <input name="nombre" id="nombre" placeholder="Ej: Romina" required autocomplete="off">
-        </div>
-        <div>
-          <label>TELEFONO (opcional)</label>
-          <input name="telefono" id="telefono" placeholder="Ej: 999999999 (opcional)" inputmode="tel" autocomplete="off">
-        </div>
+      <div>
+        <div class="small">Teléfono (opcional)</div>
+        <input name="telefono" value="{{ editing.get('telefono','') }}" placeholder="9xxxxxxxx">
       </div>
-
-      <div class="grid3" style="margin-top:10px;">
-        <div>
-          <label>FECHA (calendario)</label>
-          <input type="hidden" name="fecha" id="fecha_hidden" value="{{ today_ddmmyyyy }}">
-          <input id="fecha_picker" type="date" value="{{ today_iso }}" autocomplete="off">
-        </div>
-
-        <div>
-          <label>SERVICIO</label>
-          <select name="servicio" id="servicio" required autocomplete="off">
-            <option value="">-- Selecciona --</option>
-            {% for s in services %}
-              <option value="{{ s }}">{{ s }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label>FECHA RETOQUE (auto)</label>
-          <input id="retoque" readonly>
-        </div>
+      <div>
+        <div class="small">Fecha (YYYY-MM-DD o DD/MM/YYYY)</div>
+        <input name="fecha" value="{{ editing.get('fecha','') }}" placeholder="2026-02-12" required>
       </div>
-
-      <div style="margin-top:10px;">
-        <label>COMENTARIO</label>
-        <textarea name="comentario" id="comentario" placeholder="Ej: Se usó black y brown..." autocomplete="off"></textarea>
-      </div>
-
-      <div class="row" style="margin-top:12px;">
-        <button class="btn btn-primary" type="submit">💾 Guardar (Agregar/Actualizar)</button>
-        <button class="btn btn-ghost" type="button" onclick="clearForm()">🧹 Limpiar</button>
-
-        <button class="btn btn-warn" type="submit"
-                formaction="/undo" formmethod="post" formnovalidate
-                {% if not can_undo %}disabled{% endif %}>
-          ↩️ Deshacer
-        </button>
-
-        <a class="btn btn-ok" href="/export">📤 Exportar</a>
-      </div>
-    </form>
-  </div>
-
-  <div class="card">
-    <div class="row" style="justify-content:space-between;">
-      <div style="flex:1; min-width:240px;">
-        <label>Filtrar (en vivo)</label>
-        <input id="q" placeholder="Escribe para filtrar..." autocomplete="off">
-        <div class="muted" id="countInfo" style="margin-top:6px;"></div>
-      </div>
-    </div>
-
-    <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>NOMBRE</th>
-            <th>TELEFONO</th>
-            <th>FECHA</th>
-            <th>RETOQUE</th>
-            <th>SERVICIO</th>
-            <th>COMENTARIO</th>
-            <th class="rem">REC.</th>
-            <th class="act">ACC.</th>
-          </tr>
-        </thead>
-
-        <tbody id="tbodyRows">
-          {% for r in rows %}
-            <tr class="{{ r.row_class }}"
-                data-search="{{ (r.nombre ~ ' ' ~ r.telefono ~ ' ' ~ r.fecha ~ ' ' ~ r.servicio ~ ' ' ~ r.comentario)|lower }}"
-                onclick='loadRow({{ r|tojson }})'
-                style="cursor:pointer;">
-              <td><b>{{ r.nombre }}</b></td>
-              <td>{{ r.telefono }}</td>
-              <td>{{ r.fecha }}</td>
-              <td>{{ r.retoque }}</td>
-              <td>{{ r.servicio }}</td>
-              <td class="comment">{{ r.comentario }}</td>
-
-              <td class="rem" onclick="event.stopPropagation();">
-                <form method="post" action="/toggle_reminder" style="margin:0;" onclick="event.stopPropagation();">
-                  <input type="hidden" name="id" value="{{ r.id }}">
-                  <input type="hidden" name="target" value="">
-                  <div class="chkWrap">
-                    <input class="chk" type="checkbox"
-                           {% if r.recordatorio %}checked{% endif %}
-                           onclick="event.stopPropagation();"
-                           onchange="confirmReminder(this);">
-                  </div>
-                </form>
-              </td>
-
-              <td class="act" onclick="event.stopPropagation();">
-                <form method="post" action="/delete"
-                      onsubmit="return confirm('¿Eliminar este registro?');"
-                      style="margin:0;" onclick="event.stopPropagation();">
-                  <input type="hidden" name="id" value="{{ r.id }}">
-                  <button class="btn btn-danger" type="submit" onclick="event.stopPropagation();">🗑️</button>
-                </form>
-              </td>
-            </tr>
+      <div>
+        <div class="small">Servicio</div>
+        <select name="servicio" required>
+          <option value="">-- Selecciona --</option>
+          {% for s in services %}
+            <option value="{{s}}" {% if editing.get('servicio','') == s %}selected{% endif %}>{{s}}</option>
           {% endfor %}
-
-          {% if rows|length == 0 %}
-            <tr><td colspan="8" class="muted">No hay resultados.</td></tr>
-          {% endif %}
-        </tbody>
-      </table>
+        </select>
+      </div>
+      <div>
+        <div class="small">Fecha retoque (opcional)</div>
+        <input name="fecha_retoque" value="{{ editing.get('fecha_retoque','') }}" placeholder="(auto si vacío)">
+        <div class="small">Si lo dejas vacío: auto = fecha + {{ retoque_days }} días (o igual si es RETOQUE)</div>
+      </div>
     </div>
-  </div>
 
-</div>
+    <div style="margin-top:10px;">
+      <div class="small">Comentario</div>
+      <textarea name="comentario" placeholder="Notas...">{{ editing.get('comentario','') }}</textarea>
+    </div>
 
-<script>
-  function goFullscreen(){
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen();
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-  }
+    <div style="margin-top:12px;" class="row">
+      <button type="submit">Guardar</button>
+      <a href="/" style="padding:10px 14px; text-decoration:none; border:1px solid #ddd;">Limpiar</a>
+      <a href="/export.csv" style="padding:10px 14px; text-decoration:none; border:1px solid #ddd;">Exportar CSV</a>
+    </div>
+  </form>
 
-  function dateValueToDDMMYYYY(val){
-    const parts = (val || "").split("-");
-    if(parts.length !== 3) return "";
-    const yy = parts[0], mm = parts[1], dd = parts[2];
-    if(!yy || !mm || !dd) return "";
-    return `${dd}/${mm}/${yy}`;
-  }
+  <h3 style="margin-top:22px;">Registros ({{ rows|length }})</h3>
 
-  function ddmmyyyyToDateValue(ddmmyyyy){
-    const parts = (ddmmyyyy || "").split("/");
-    if(parts.length !== 3) return "";
-    const dd = parts[0], mm = parts[1], yy = parts[2];
-    if(dd.length!==2 || mm.length!==2 || yy.length!==4) return "";
-    return `${yy}-${mm}-${dd}`;
-  }
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Teléfono</th>
+        <th>Fecha</th>
+        <th>Fecha retoque</th>
+        <th>Servicio</th>
+        <th>Comentario</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r.get('nombre','') }}</td>
+          <td>{{ r.get('telefono','') }}</td>
+          <td>{{ r.get('fecha','') }}</td>
+          <td>{{ r.get('fecha_retoque','') }}</td>
+          <td>{{ r.get('servicio','') }}</td>
+          <td style="max-width:380px; white-space:pre-wrap;">{{ r.get('comentario','') }}</td>
+          <td>
+            <a href="/?edit={{ r.get('id','') }}">Editar</a>
+            |
+            <a href="/delete?id={{ r.get('id','') }}" onclick="return confirm('¿Eliminar?')">Eliminar</a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
-  function computeRetouchFromHidden(servicio){
-    const ddmmyyyy = document.getElementById("fecha_hidden").value.trim();
-    try{
-      const parts = ddmmyyyy.split("/");
-      if(parts.length !== 3) return "";
-      const d = parseInt(parts[0],10), m = parseInt(parts[1],10)-1, y = parseInt(parts[2],10);
-      const dt = new Date(y, m, d);
-      if(isNaN(dt.getTime())) return "";
-      const isRet = (servicio || "").trim().toUpperCase() === "RETOQUE";
-      const days = isRet ? 365 : 20;
-      dt.setDate(dt.getDate() + days);
-      const dd = String(dt.getDate()).padStart(2,"0");
-      const mm = String(dt.getMonth()+1).padStart(2,"0");
-      const yy = dt.getFullYear();
-      return `${dd}/${mm}/${yy}`;
-    }catch(e){ return ""; }
-  }
-
-  function updateRetouch(){
-    const s = document.getElementById("servicio").value.trim();
-    document.getElementById("retoque").value = computeRetouchFromHidden(s);
-  }
-
-  function syncHiddenFromPicker(){
-    const picker = document.getElementById("fecha_picker");
-    const hidden = document.getElementById("fecha_hidden");
-    const ddmmyyyy = dateValueToDDMMYYYY(picker.value);
-    if(ddmmyyyy) hidden.value = ddmmyyyy;
-    updateRetouch();
-  }
-
-  function loadRow(r){
-    document.getElementById("rid").value = r.id || "";
-    document.getElementById("nombre").value = r.nombre || "";
-    document.getElementById("telefono").value = r.telefono || "";
-    document.getElementById("servicio").value = r.servicio || "";
-    document.getElementById("comentario").value = r.comentario || "";
-
-    const picker = document.getElementById("fecha_picker");
-    const hidden = document.getElementById("fecha_hidden");
-    hidden.value = r.fecha || hidden.value;
-    const iso = ddmmyyyyToDateValue(hidden.value);
-    if(iso) picker.value = iso;
-
-    updateRetouch();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function clearForm(){
-    document.getElementById("rid").value = "";
-    document.getElementById("nombre").value = "";
-    document.getElementById("telefono").value = "";
-    document.getElementById("servicio").value = "";
-    document.getElementById("comentario").value = "";
-
-    document.getElementById("fecha_picker").value = "{{ today_iso }}";
-    document.getElementById("fecha_hidden").value = "{{ today_ddmmyyyy }}";
-
-    updateRetouch();
-  }
-
-  // ✅ Checkbox recordatorio (con confirm) y target correcto
-  function confirmReminder(chk){
-    const form = chk.closest("form");
-    const targetInput = form.querySelector('input[name="target"]');
-    const want = chk.checked ? "1" : "0";
-    targetInput.value = want;
-
-    const msg = (want === "1")
-      ? "¿Se le envió recordatorio?\n\nSí = marcar / No = no marcar"
-      : "¿Quitar marca de recordatorio?\n\nSí = quitar / No = mantener";
-
-    const ok = confirm(msg);
-    if(ok){
-      form.submit();
-    } else {
-      chk.checked = !chk.checked; // revierte visualmente
-    }
-  }
-
-  // ✅ Filtro EN VIVO (sin recargar página)
-  function applyFilterLive(){
-    const q = (document.getElementById("q").value || "").trim().toLowerCase();
-    const tbody = document.getElementById("tbodyRows");
-    const trs = Array.from(tbody.querySelectorAll("tr"));
-
-    let shown = 0;
-    let total = 0;
-
-    for(const tr of trs){
-      // ignora fila "No hay resultados"
-      if(tr.children.length < 2) continue;
-
-      total += 1;
-      const hay = (tr.getAttribute("data-search") || "");
-      const ok = !q || hay.includes(q);
-      tr.style.display = ok ? "" : "none";
-      if(ok) shown += 1;
-    }
-
-    const info = document.getElementById("countInfo");
-    info.textContent = `Mostrando ${shown} de ${total} registros`;
-  }
-
-  document.getElementById("q").addEventListener("input", applyFilterLive);
-  document.getElementById("fecha_picker").addEventListener("change", syncHiddenFromPicker);
-  document.getElementById("servicio").addEventListener("change", updateRetouch);
-
-  syncHiddenFromPicker();
-  applyFilterLive();
-</script>
 </body>
 </html>
 """
 
-
+# =========================
+# ROUTES
+# =========================
 @APP.get("/")
-def index():
-    # Ya no usamos filtro por URL para evitar que el teclado “se corte” en tablet.
-    data = load_data()
-
-    rows = []
-    nearest = None
-
-    for r in data:
-        retoque = ""
-        due = False
-        try:
-            retoque = compute_retouch_date(r["fecha"], r["servicio"])
-            due = is_due(retoque)
-        except Exception:
-            pass
-
-        if retoque:
-            try:
-                d = parse_ddmmyyyy(retoque).date()
-                if nearest is None or d < nearest[0]:
-                    nearest = (d, retoque)
-            except Exception:
-                pass
-
-        rows.append({**r, "retoque": retoque, "row_class": ("due" if due else "")})
-
-    today_iso = datetime.now().strftime("%Y-%m-%d")
-    today_ddmmyyyy = datetime.now().strftime("%d/%m/%Y")
-
-    banner = "Retoque: —"
-    if nearest:
-        d, txt = nearest
-        diff = (d - datetime.now().date()).days
-        if diff > 0:
-            banner = f"Próximo retoque más cercano: {txt} (faltan {diff} días)"
-        else:
-            banner = f"⚠️ Hay retoques que ya tocan (ej: {txt})"
-
-    error = request.args.get("error") or ""
+def home():
+    msg = request.args.get("msg", "")
+    edit_id = request.args.get("edit", "")
+    rows = fetch_rows()
+    editing = {}
+    if edit_id:
+        for r in rows:
+            if r.get("id") == edit_id:
+                editing = dict(r)
+                break
     return render_template_string(
         HTML,
         rows=rows,
+        editing=editing,
         services=SERVICES,
-        today_iso=today_iso,
-        today_ddmmyyyy=today_ddmmyyyy,
-        banner=banner,
-        error=error,
-        can_undo=can_undo(),
+        retoque_days=RETOQUE_DAYS,
+        msg=msg,
     )
-
-
-from datetime import datetime
-from flask import request, redirect
-import uuid
 
 @APP.post("/save")
 def save():
     try:
-        # Obtener datos del formulario
-        rid = (request.form.get("id") or "").strip()
-        nombre = (request.form.get("nombre") or "").strip()
-        telefono = (request.form.get("telefono") or "").strip()
-        fecha = (request.form.get("fecha") or "").strip()
-        servicio = (request.form.get("servicio") or "").strip()
-        comentario = (request.form.get("comentario") or "").strip()
+        rid = safe_str(request.form.get("id"))
+        nombre = safe_str(request.form.get("nombre"))
+        telefono = safe_str(request.form.get("telefono"))
+        servicio = safe_str(request.form.get("servicio")).upper()
+        comentario = safe_str(request.form.get("comentario"))
 
-        # Checkbox (evita error si no vienen)
-        rec = True if request.form.get("rec") == "on" else False
-        acc = True if request.form.get("acc") == "on" else False
+        fecha = parse_date_any(request.form.get("fecha"))
+        fecha_retoque_in = parse_date_any(request.form.get("fecha_retoque"))
 
-        # Validación básica
-        if not nombre or not fecha or not servicio:
-            return redirect("/?error=Campos obligatorios")
+        if not nombre:
+            return redirect("/?msg=Falta+nombre")
+        if not servicio:
+            return redirect("/?msg=Falta+servicio")
+        if servicio not in SERVICES:
+            return redirect("/?msg=Servicio+inv%C3%A1lido")
+        if not fecha:
+            return redirect("/?msg=Fecha+inv%C3%A1lida+(usa+YYYY-MM-DD+o+DD/MM/YYYY)")
 
-        # Fecha retoque automática (30 días después)
-        fecha_retoque = ""
-        try:
-            fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
-            fecha_retoque = (fecha_obj.replace(day=fecha_obj.day) + 
-                             timedelta(days=30)).strftime("%Y-%m-%d")
-        except:
-            fecha_retoque = ""
+        fecha_retoque = calc_fecha_retoque(servicio, fecha, fecha_retoque_in)
 
-        data = {
+        if not rid:
+            rid = str(uuid.uuid4())
+
+        payload = {
+            "id": rid,
             "nombre": nombre,
-            "telefono": telefono,
-            "fecha": fecha,
+            "telefono": telefono if telefono else None,
+            "fecha": iso_date(fecha),
             "servicio": servicio,
-            "comentario": comentario,
-            "recordatorio": rec,
-            "updated_at": datetime.utcnow().isoformat()
+            "comentario": comentario if comentario else None,
+            "fecha_retoque": iso_date(fecha_retoque),
         }
 
-        if rid:
-            # UPDATE
-            SUPABASE.table("crm_records").update(data).eq("id", rid).execute()
-        else:
-            # INSERT
-            data["id"] = str(uuid.uuid4())
-            SUPABASE.table("crm_records").insert(data).execute()
+        # Upsert (crea o actualiza)
+        SUPABASE.table(CRM_TABLE).upsert(payload).execute()
 
-        return redirect("/")
-
+        return redirect("/?msg=Guardado+OK")
     except Exception as e:
-        print("ERROR SAVE:", e)
-        return "Internal Server Error", 500
+        # Esto te muestra el error real en pantalla (para no quedarnos a ciegas)
+        return redirect("/?msg=ERROR:+{}".format(str(e).replace(" ", "+")))
 
-
-@APP.post("/delete")
+@APP.get("/delete")
 def delete():
-    data = load_data()
-    before = deepcopy(data)
-
-    rid = (request.form.get("id") or "").strip()
+    rid = request.args.get("id", "")
     if rid:
-        push_undo_snapshot(before)
-        delete_row(rid)
+        SUPABASE.table(CRM_TABLE).delete().eq("id", rid).execute()
+    return redirect("/?msg=Eliminado")
 
-    return redirect("/")
+@APP.get("/export.csv")
+def export_csv():
+    rows = fetch_rows()
+    def esc(s):
+        s = "" if s is None else str(s)
+        s = s.replace('"', '""')
+        return f'"{s}"'
+    headers = ["nombre", "telefono", "fecha", "fecha_retoque", "servicio", "comentario"]
+    out = [",".join(headers)]
+    for r in rows:
+        out.append(",".join(esc(r.get(h, "")) for h in headers))
+    csv_text = "\n".join(out)
+    return Response(
+        csv_text,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=crm_export.csv"},
+    )
 
-
-@APP.post("/toggle_reminder")
-def toggle_reminder():
-    data = load_data()
-    before = deepcopy(data)
-
-    rid = (request.form.get("id") or "").strip()
-    target = (request.form.get("target") or "").strip()  # "1" marcar, "0" desmarcar
-    want = True if target == "1" else False
-
-    if rid:
-        push_undo_snapshot(before)
-        set_recordatorio(rid, want)
-
-    return redirect("/")
-
-
-@APP.post("/undo")
-def undo():
-    snap = pop_undo_snapshot()
-    if snap is None:
-        return redirect("/")
-    replace_all_rows(snap)
-    return redirect("/")
-
-
-# ---------- Export Excel ----------
-def build_export_excel(path: str, data: list):
-    if os.path.exists(path):
-        try:
-            wb = load_workbook(path)
-            if "CRM" in wb.sheetnames:
-                ws = wb["CRM"]
-                wb.remove(ws)
-            ws = wb.create_sheet("CRM", 0)
-        except Exception:
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "CRM"
-    else:
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "CRM"
-
-    ws.append(COLUMNS_XLSX)
-
-    for r in data:
-        retoque = ""
-        try:
-            retoque = compute_retouch_date(r["fecha"], r["servicio"])
-        except Exception:
-            pass
-        ws.append([r["nombre"], r["telefono"], r["fecha"], retoque, r["servicio"], r["comentario"]])
-
-    header_fill = PatternFill("solid", fgColor="D9EAD3")
-    header_font = Font(bold=True, size=12)
-    cell_font = Font(size=11)
-
-    thin = Side(style="thin", color="999999")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    due_fill = PatternFill("solid", fgColor="FFF2CC")
-
-    col_widths = {"A": 18, "B": 16, "C": 14, "D": 16, "E": 22, "F": 48}
-    for col, w in col_widths.items():
-        ws.column_dimensions[col].width = w
-
-    ws.row_dimensions[1].height = 26
-    for i in range(2, ws.max_row + 1):
-        ws.row_dimensions[i].height = 42
-
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=len(COLUMNS_XLSX)):
-        row_idx = row[0].row
-        retoque_cell = ws.cell(row=row_idx, column=4)
-        due = (row_idx != 1) and is_due(str(retoque_cell.value or ""))
-
-        for cell in row:
-            cell.border = border
-            cell.alignment = align
-            if row_idx == 1:
-                cell.fill = header_fill
-                cell.font = header_font
-            else:
-                cell.font = cell_font
-                if due:
-                    cell.fill = due_fill
-
-    if "Sheet" in wb.sheetnames and len(wb.sheetnames) > 1:
-        sh = wb["Sheet"]
-        if sh.max_row == 1 and sh.max_column == 1 and (sh["A1"].value is None):
-            wb.remove(sh)
-
-    wb.save(path)
-
-
-@APP.get("/export")
-def export():
-    data = load_data()
-    build_export_excel(EXPORT_FILE, data)
-    return send_file(EXPORT_FILE, as_attachment=True, download_name=EXPORT_FILE)
-
-
-if __name__ == "__main__":
-    APP.run(host="0.0.0.0", port=5000, debug=True)
+# Render/Gunicorn usa APP
