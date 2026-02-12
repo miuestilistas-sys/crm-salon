@@ -602,43 +602,61 @@ def index():
     )
 
 
+from datetime import datetime
+from flask import request, redirect
+import uuid
+
 @APP.post("/save")
 def save():
-    data = load_data()
-    before = deepcopy(data)
+    try:
+        # Obtener datos del formulario
+        rid = (request.form.get("id") or "").strip()
+        nombre = (request.form.get("nombre") or "").strip()
+        telefono = (request.form.get("telefono") or "").strip()
+        fecha = (request.form.get("fecha") or "").strip()
+        servicio = (request.form.get("servicio") or "").strip()
+        comentario = (request.form.get("comentario") or "").strip()
 
-    rid = (request.form.get("id") or "").strip()
-    nombre = (request.form.get("nombre") or "").strip()
-    telefono = (request.form.get("telefono") or "").strip()
-    fecha = (request.form.get("fecha") or "").strip()
-    servicio = (request.form.get("servicio") or "").strip()
-    comentario = (request.form.get("comentario") or "").strip()
+        # Checkbox (evita error si no vienen)
+        rec = True if request.form.get("rec") == "on" else False
+        acc = True if request.form.get("acc") == "on" else False
 
-    err = validate_row(nombre, fecha, servicio)
-    if err:
-        return redirect(f"/?error={err}")
+        # Validación básica
+        if not nombre or not fecha or not servicio:
+            return redirect("/?error=Campos obligatorios")
 
-    # Si es update, conservamos recordatorio actual
-    recordatorio_actual = False
-    if rid:
-        for r in data:
-            if r.get("id") == rid:
-                recordatorio_actual = bool(r.get("recordatorio", False))
-                break
-    else:
-        rid = str(uuid.uuid4())
+        # Fecha retoque automática (30 días después)
+        fecha_retoque = ""
+        try:
+            fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
+            fecha_retoque = (fecha_obj.replace(day=fecha_obj.day) + 
+                             timedelta(days=30)).strftime("%Y-%m-%d")
+        except:
+            fecha_retoque = ""
 
-    push_undo_snapshot(before)
-    save_row_upsert(
-        rid=rid,
-        nombre=nombre,
-        telefono=telefono,
-        fecha=fecha,
-        servicio=servicio,
-        comentario=comentario,
-        recordatorio=recordatorio_actual
-    )
-    return redirect("/")
+        data = {
+            "nombre": nombre,
+            "telefono": telefono,
+            "fecha": fecha,
+            "servicio": servicio,
+            "comentario": comentario,
+            "recordatorio": rec,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+
+        if rid:
+            # UPDATE
+            SUPABASE.table("crm_records").update(data).eq("id", rid).execute()
+        else:
+            # INSERT
+            data["id"] = str(uuid.uuid4())
+            SUPABASE.table("crm_records").insert(data).execute()
+
+        return redirect("/")
+
+    except Exception as e:
+        print("ERROR SAVE:", e)
+        return "Internal Server Error", 500
 
 
 @APP.post("/delete")
