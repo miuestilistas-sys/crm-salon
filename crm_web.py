@@ -10,13 +10,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 # --- Supabase ---
-from supabase import create_client
-import os
+from supabase import create_client, Client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
-
-SUPABASE = create_client(SUPABASE_URL, SUPABASE_KEY)
 APP = Flask(__name__)
 
 EXPORT_FILE = "crm_export.xlsx"
