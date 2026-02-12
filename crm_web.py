@@ -9,11 +9,13 @@ from flask import Flask, request, redirect, send_file, render_template_string, R
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+# --- Supabase ---
+from supabase import create_client, Client
+
 APP = Flask(__name__)
-DATA_FILE = "crm_data.json"
-UNDO_FILE = "crm_undo.json"
+
 EXPORT_FILE = "crm_export.xlsx"
-UNDO_MAX = 30  # historial tipo Ctrl+Z
+UNDO_MAX = 30  # historial tipo Ctrl+Z (en Supabase)
 
 SERVICES = [
     "CEJAS",
@@ -26,25 +28,24 @@ SERVICES = [
 
 COLUMNS_XLSX = ["NOMBRE", "TELEFONO", "FECHA", "FECHA RETOQUE", "SERVICIO", "COMENTARIO"]
 
+CRM_TABLE = "crm_records"
+UNDO_TABLE = "crm_undo_snapshots"  # la creamos también (opcional pero recomendado)
+
 
 # ---------- fechas ----------
 def parse_ddmmyyyy(s: str):
     return datetime.strptime(s.strip(), "%d/%m/%Y")
 
-
 def fmt_ddmmyyyy(dt: datetime):
     return dt.strftime("%d/%m/%Y")
 
-
 def is_retouch_service(service: str) -> bool:
     return service.strip().upper() == "RETOQUE"
-
 
 def compute_retouch_date(fecha_str: str, service: str) -> str:
     dt = parse_ddmmyyyy(fecha_str)
     days = 365 if is_retouch_service(service) else 20
     return fmt_ddmmyyyy(dt + timedelta(days=days))
-
 
 def is_due(retouch_str: str) -> bool:
     try:
@@ -54,68 +55,135 @@ def is_due(retouch_str: str) -> bool:
         return False
 
 
-# ---------- persistencia ----------
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return []
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        out = []
-        for r in data:
-            out.append(
-                {
-                    "id": r.get("id") or str(uuid.uuid4()),
-                    "nombre": (r.get("nombre") or "").strip(),
-                    "telefono": (r.get("telefono") or "").strip(),
-                    "fecha": (r.get("fecha") or "").strip(),  # dd/mm/yyyy
-                    "servicio": (r.get("servicio") or "").strip(),
-                    "comentario": (r.get("comentario") or "").strip(),
-                    "recordatorio": bool(r.get("recordatorio", False)),
-                }
-            )
-        return out
-    except Exception:
-        return []
+# ---------- Supabase client ----------
+def get_sb() -> Client:
+    url = os.environ.get("SUPABASE_URL", "").strip()
+    key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+    if not url or not key:
+        raise RuntimeError("Falta SUPABASE_URL o SUPABASE_ANON_KEY en Environment Variables (Render).")
+    return create_client(url, key)
 
 
-def save_data(rows):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(rows, f, ensure_ascii=False, indent=2)
+# ---------- persistencia (Supabase) ----------
+def load_data(q: str = ""):
+    sb = get_sb()
+    q = (q or "").strip()
 
+    # Traemos todo (ordenado), y filtramos por nombre si hay q (más simple y estable)
+    resp = sb.table(CRM_TABLE).select("*").order("created_at", desc=True).execute()
+    rows = resp.data or []
 
-# ---------- Undo tipo Ctrl+Z (historial) ----------
-def load_undo_stack():
-    if not os.path.exists(UNDO_FILE):
-        return []
-    try:
-        with open(UNDO_FILE, "r", encoding="utf-8") as f:
-            obj = json.load(f)
-        stack = obj.get("stack", [])
-        return stack if isinstance(stack, list) else []
-    except Exception:
-        return []
+    out = []
+    for r in rows:
+        out.append({
+            "id": str(r.get("id") or ""),
+            "nombre": (r.get("nombre") or "").strip(),
+            "telefono": (r.get("telefono") or "").strip(),
+            "fecha": (r.get("fecha") or "").strip(),
+            "servicio": (r.get("servicio") or "").strip(),
+            "comentario": (r.get("comentario") or "").strip(),
+            "recordatorio": bool(r.get("recordatorio", False)),
+            "created_at": r.get("created_at"),
+        })
 
+    if q:
+        ql = q.lower()
+        out = [r for r in out if ql in (r["nombre"] or "").lower()]
 
-def save_undo_stack(stack):
-    stack = stack[-UNDO_MAX:]
-    with open(UNDO_FILE, "w", encoding="utf-8") as f:
-        json.dump({"stack": stack}, f, ensure_ascii=False, indent=2)
+    return out
 
 
 def push_undo_snapshot(before_rows):
-    stack = load_undo_stack()
-    stack.append(before_rows)
-    save_undo_stack(stack)
+    """
+    Guarda snapshot en tabla UNDO_TABLE para Deshacer.
+    Si no existe la tabla, simplemente no rompe (solo deshabilita undo).
+    """
+    try:
+        sb = get_sb()
+        sb.table(UNDO_TABLE).insert({
+            "snapshot": before_rows
+        }).execute()
+
+        # Mantener solo los últimos UNDO_MAX
+        resp = sb.table(UNDO_TABLE).select("id").order("id", desc=True).execute()
+        ids = [r["id"] for r in (resp.data or [])]
+        if len(ids) > UNDO_MAX:
+            to_delete = ids[UNDO_MAX:]
+            sb.table(UNDO_TABLE).delete().in_("id", to_delete).execute()
+    except Exception:
+        pass
+
+
+def can_undo():
+    try:
+        sb = get_sb()
+        resp = sb.table(UNDO_TABLE).select("id").order("id", desc=True).limit(1).execute()
+        return bool(resp.data)
+    except Exception:
+        return False
 
 
 def pop_undo_snapshot():
-    stack = load_undo_stack()
-    if not stack:
+    try:
+        sb = get_sb()
+        resp = sb.table(UNDO_TABLE).select("*").order("id", desc=True).limit(1).execute()
+        if not resp.data:
+            return None
+        row = resp.data[0]
+        sid = row["id"]
+        snap = row.get("snapshot")
+        sb.table(UNDO_TABLE).delete().eq("id", sid).execute()
+        return snap
+    except Exception:
         return None
-    snap = stack.pop()
-    save_undo_stack(stack)
-    return snap
+
+
+def save_row_upsert(rid, nombre, telefono, fecha, servicio, comentario, recordatorio=False):
+    sb = get_sb()
+    payload = {
+        "id": rid,
+        "nombre": nombre,
+        "telefono": telefono,
+        "fecha": fecha,
+        "servicio": servicio,
+        "comentario": comentario,
+        "recordatorio": bool(recordatorio),
+    }
+    sb.table(CRM_TABLE).upsert(payload).execute()
+
+
+def delete_row(rid):
+    sb = get_sb()
+    sb.table(CRM_TABLE).delete().eq("id", rid).execute()
+
+
+def set_recordatorio(rid, want: bool):
+    sb = get_sb()
+    sb.table(CRM_TABLE).update({"recordatorio": bool(want)}).eq("id", rid).execute()
+
+
+def replace_all_rows(rows):
+    """
+    Restaura todo a un snapshot (para Undo).
+    """
+    sb = get_sb()
+    # Borra todo
+    sb.table(CRM_TABLE).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+
+    # Inserta todo
+    if rows:
+        ins = []
+        for r in rows:
+            ins.append({
+                "id": r.get("id") or str(uuid.uuid4()),
+                "nombre": r.get("nombre", ""),
+                "telefono": r.get("telefono", ""),
+                "fecha": r.get("fecha", ""),
+                "servicio": r.get("servicio", ""),
+                "comentario": r.get("comentario", ""),
+                "recordatorio": bool(r.get("recordatorio", False)),
+            })
+        sb.table(CRM_TABLE).insert(ins).execute()
 
 
 # ---------- validación ----------
@@ -138,7 +206,6 @@ HTML = r"""
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta name="theme-color" content="#2563eb"/>
-  <link rel="manifest" href="/manifest.webmanifest">
   <title>CRM Salón</title>
 
   <style>
@@ -170,27 +237,26 @@ HTML = r"""
     tr.due { background: #fff2cc; }
     tr:hover { outline: 2px solid rgba(37,99,235,.15); }
 
-    /* columnas delgadas */
     th.rem, td.rem { width: 62px; padding-left: 6px; padding-right: 6px; }
     th.act, td.act { width: 62px; padding-left: 6px; padding-right: 6px; }
 
-    /* checkbox verde */
     .chk { width: 22px; height: 22px; accent-color: #16a34a; cursor: pointer; }
     .chkWrap { display:flex; justify-content:center; align-items:center; }
 
-    /* ✅ Tabla scrolleable: para ver TODOS los registros */
-    .tableWrap {
-      overflow: auto;
-      max-height: 60vh;
-      border-radius: 12px;
+    /* ✅ Scroll de tabla para ver TODOS */
+    .tableWrap{
+      overflow:auto;
+      max-height: 58vh;
       -webkit-overflow-scrolling: touch;
+      margin-top:10px;
+      border-radius: 12px;
     }
 
     @media (max-width: 820px){
       .grid, .grid3 { grid-template-columns: 1fr; }
       th, td { font-size: 13px; padding: 8px; }
       th.rem, td.rem, th.act, td.act { width: 56px; }
-      .tableWrap { max-height: 55vh; }
+      .tableWrap{ max-height: 52vh; }
     }
   </style>
 </head>
@@ -276,16 +342,13 @@ HTML = r"""
     <div class="row" style="justify-content:space-between;">
       <div style="flex:1; min-width:240px;">
         <label>Filtrar (en vivo)</label>
-        <!-- ✅ filtro sin recargar (ya no se traba en 1 letra) -->
         <input id="q" placeholder="Escribe para filtrar..." autocomplete="off">
-        <div class="muted" style="margin-top:6px;">
-          Filtra por: nombre, teléfono, servicio o comentario.
-        </div>
+        <div class="muted" id="countInfo" style="margin-top:6px;"></div>
       </div>
     </div>
 
-    <div class="tableWrap" style="margin-top:10px;">
-      <table id="crmTable">
+    <div class="tableWrap">
+      <table>
         <thead>
           <tr>
             <th>NOMBRE</th>
@@ -299,10 +362,10 @@ HTML = r"""
           </tr>
         </thead>
 
-        <tbody id="crmBody">
+        <tbody id="tbodyRows">
           {% for r in rows %}
             <tr class="{{ r.row_class }}"
-                data-search="{{ (r.nombre ~ ' ' ~ r.telefono ~ ' ' ~ r.fecha ~ ' ' ~ r.retoque ~ ' ' ~ r.servicio ~ ' ' ~ r.comentario)|lower }}"
+                data-search="{{ (r.nombre ~ ' ' ~ r.telefono ~ ' ' ~ r.fecha ~ ' ' ~ r.servicio ~ ' ' ~ r.comentario)|lower }}"
                 onclick='loadRow({{ r|tojson }})'
                 style="cursor:pointer;">
               <td><b>{{ r.nombre }}</b></td>
@@ -312,11 +375,10 @@ HTML = r"""
               <td>{{ r.servicio }}</td>
               <td class="comment">{{ r.comentario }}</td>
 
-              <!-- ✅ RECORDATORIO ARREGLADO -->
               <td class="rem" onclick="event.stopPropagation();">
                 <form method="post" action="/toggle_reminder" style="margin:0;" onclick="event.stopPropagation();">
                   <input type="hidden" name="id" value="{{ r.id }}">
-                  <input type="hidden" name="target" value="{% if r.recordatorio %}0{% else %}1{% endif %}">
+                  <input type="hidden" name="target" value="">
                   <div class="chkWrap">
                     <input class="chk" type="checkbox"
                            {% if r.recordatorio %}checked{% endif %}
@@ -431,99 +493,64 @@ HTML = r"""
     updateRetouch();
   }
 
-  // ✅ filtro EN VIVO (sin recargar, ya no se traba en 1 letra)
-  function liveFilter(){
-    const q = (document.getElementById("q").value || "").trim().toLowerCase();
-    const rows = document.querySelectorAll("#crmBody tr[data-search]");
-    let any = false;
-    rows.forEach(tr => {
-      const hay = (tr.getAttribute("data-search") || "");
-      const show = !q || hay.includes(q);
-      tr.style.display = show ? "" : "none";
-      if(show) any = true;
-    });
-    // si no hay coincidencias, no rompe nada (solo oculta)
-  }
-
-  // ✅ checkbox: arreglado (antes el hidden "target" quedaba viejo)
+  // ✅ Checkbox recordatorio (con confirm) y target correcto
   function confirmReminder(chk){
     const form = chk.closest("form");
-    const hiddenTarget = form.querySelector('input[name="target"]');
-
-    // lo que el usuario quiere (después del click)
+    const targetInput = form.querySelector('input[name="target"]');
     const want = chk.checked ? "1" : "0";
-    hiddenTarget.value = want;
+    targetInput.value = want;
 
     const msg = (want === "1")
-      ? "¿Se le envió recordatorio?\n\nSí = guardar marca"
-      : "¿Quitar marca de recordatorio?\n\nSí = quitar";
+      ? "¿Se le envió recordatorio?\n\nSí = marcar / No = no marcar"
+      : "¿Quitar marca de recordatorio?\n\nSí = quitar / No = mantener";
 
     const ok = confirm(msg);
     if(ok){
       form.submit();
     } else {
-      // revierte visual y target
-      chk.checked = !chk.checked;
-      hiddenTarget.value = chk.checked ? "1" : "0";
+      chk.checked = !chk.checked; // revierte visualmente
     }
   }
 
-  document.getElementById("q").addEventListener("input", liveFilter);
+  // ✅ Filtro EN VIVO (sin recargar página)
+  function applyFilterLive(){
+    const q = (document.getElementById("q").value || "").trim().toLowerCase();
+    const tbody = document.getElementById("tbodyRows");
+    const trs = Array.from(tbody.querySelectorAll("tr"));
+
+    let shown = 0;
+    let total = 0;
+
+    for(const tr of trs){
+      // ignora fila "No hay resultados"
+      if(tr.children.length < 2) continue;
+
+      total += 1;
+      const hay = (tr.getAttribute("data-search") || "");
+      const ok = !q || hay.includes(q);
+      tr.style.display = ok ? "" : "none";
+      if(ok) shown += 1;
+    }
+
+    const info = document.getElementById("countInfo");
+    info.textContent = `Mostrando ${shown} de ${total} registros`;
+  }
+
+  document.getElementById("q").addEventListener("input", applyFilterLive);
   document.getElementById("fecha_picker").addEventListener("change", syncHiddenFromPicker);
   document.getElementById("servicio").addEventListener("change", updateRetouch);
 
   syncHiddenFromPicker();
-  liveFilter();
-
-  // ✅ PWA: service worker SIN CACHE (borra caches viejos)
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js?v=12").catch(()=>{});
-  }
+  applyFilterLive();
 </script>
 </body>
 </html>
 """
 
 
-@APP.get("/manifest.webmanifest")
-def manifest():
-    m = {
-        "name": "CRM Salon",
-        "short_name": "CRM",
-        "start_url": "/",
-        "display": "fullscreen",
-        "background_color": "#f6f7fb",
-        "theme_color": "#2563eb",
-        "icons": [],
-    }
-    return Response(json.dumps(m), mimetype="application/manifest+json")
-
-
-@APP.get("/sw.js")
-def sw():
-    # ✅ NO CACHE: siempre red + borra caches viejos
-    js = r"""
-self.addEventListener("install", (e) => {
-  self.skipWaiting();
-});
-self.addEventListener("activate", (e) => {
-  e.waitUntil((async () => {
-    try{
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-    }catch(e){}
-    await self.clients.claim();
-  })());
-});
-self.addEventListener("fetch", (e) => {
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-});
-"""
-    return Response(js, mimetype="application/javascript")
-
-
 @APP.get("/")
 def index():
+    # Ya no usamos filtro por URL para evitar que el teclado “se corte” en tablet.
     data = load_data()
 
     rows = []
@@ -561,8 +588,6 @@ def index():
             banner = f"⚠️ Hay retoques que ya tocan (ej: {txt})"
 
     error = request.args.get("error") or ""
-    can_undo = len(load_undo_stack()) > 0
-
     return render_template_string(
         HTML,
         rows=rows,
@@ -571,7 +596,7 @@ def index():
         today_ddmmyyyy=today_ddmmyyyy,
         banner=banner,
         error=error,
-        can_undo=can_undo,
+        can_undo=can_undo(),
     )
 
 
@@ -591,50 +616,26 @@ def save():
     if err:
         return redirect(f"/?error={err}")
 
+    # Si es update, conservamos recordatorio actual
+    recordatorio_actual = False
     if rid:
-        found = False
         for r in data:
-            if r["id"] == rid:
-                rec = bool(r.get("recordatorio", False))
-                r.update(
-                    {
-                        "nombre": nombre,
-                        "telefono": telefono,
-                        "fecha": fecha,
-                        "servicio": servicio,
-                        "comentario": comentario,
-                        "recordatorio": rec,
-                    }
-                )
-                found = True
+            if r.get("id") == rid:
+                recordatorio_actual = bool(r.get("recordatorio", False))
                 break
-        if not found:
-            data.append(
-                {
-                    "id": rid,
-                    "nombre": nombre,
-                    "telefono": telefono,
-                    "fecha": fecha,
-                    "servicio": servicio,
-                    "comentario": comentario,
-                    "recordatorio": False,
-                }
-            )
     else:
-        data.append(
-            {
-                "id": str(uuid.uuid4()),
-                "nombre": nombre,
-                "telefono": telefono,
-                "fecha": fecha,
-                "servicio": servicio,
-                "comentario": comentario,
-                "recordatorio": False,
-            }
-        )
+        rid = str(uuid.uuid4())
 
     push_undo_snapshot(before)
-    save_data(data)
+    save_row_upsert(
+        rid=rid,
+        nombre=nombre,
+        telefono=telefono,
+        fecha=fecha,
+        servicio=servicio,
+        comentario=comentario,
+        recordatorio=recordatorio_actual
+    )
     return redirect("/")
 
 
@@ -644,10 +645,10 @@ def delete():
     before = deepcopy(data)
 
     rid = (request.form.get("id") or "").strip()
-    data = [r for r in data if r.get("id") != rid]
+    if rid:
+        push_undo_snapshot(before)
+        delete_row(rid)
 
-    push_undo_snapshot(before)
-    save_data(data)
     return redirect("/")
 
 
@@ -660,13 +661,10 @@ def toggle_reminder():
     target = (request.form.get("target") or "").strip()  # "1" marcar, "0" desmarcar
     want = True if target == "1" else False
 
-    for r in data:
-        if r.get("id") == rid:
-            r["recordatorio"] = want
-            break
+    if rid:
+        push_undo_snapshot(before)
+        set_recordatorio(rid, want)
 
-    push_undo_snapshot(before)
-    save_data(data)
     return redirect("/")
 
 
@@ -675,7 +673,7 @@ def undo():
     snap = pop_undo_snapshot()
     if snap is None:
         return redirect("/")
-    save_data(snap)
+    replace_all_rows(snap)
     return redirect("/")
 
 
