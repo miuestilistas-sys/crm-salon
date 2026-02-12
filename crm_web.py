@@ -9,8 +9,17 @@ from flask import Flask, request, redirect, send_file, render_template_string, R
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-# --- Supabase ---
-from supabase import create_client, Client
+# ---------------- SUPABASE ----------------
+from supabase import create_client
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise Exception("Faltan variables SUPABASE_URL o SUPABASE_ANON_KEY en Render")
+
+SUPABASE = create_client(SUPABASE_URL, SUPABASE_KEY)
+# -----------------------------------------
 
 APP = Flask(__name__)
 
