@@ -471,35 +471,41 @@ function computeRetouchFromHidden(servicio){
 }
   }
 
-  function updateRetouch(){
-    const s = document.getElementById("servicio").value.trim();
-    document.getElementById("retoque").value = computeRetouchFromHidden(s);
+function updateRetouch(){
+  const servicio = document.getElementById("servicio").value.trim().toUpperCase();
+  const fechaHidden = document.getElementById("fecha_hidden").value.trim();
+
+  if(!fechaHidden) {
+    document.getElementById("retoque").value = "";
+    return;
   }
 
-  function syncHiddenFromPicker(){
-    const picker = document.getElementById("fecha_picker");
-    const hidden = document.getElementById("fecha_hidden");
-    const ddmmyyyy = dateValueToDDMMYYYY(picker.value);
-    if(ddmmyyyy) hidden.value = ddmmyyyy;
-    updateRetouch();
+  const parts = fechaHidden.split("/");
+  if(parts.length !== 3){
+    document.getElementById("retoque").value = "";
+    return;
   }
 
-  function loadRow(r){
-    document.getElementById("rid").value = r.id || "";
-    document.getElementById("nombre").value = r.nombre || "";
-    document.getElementById("telefono").value = r.telefono || "";
-    document.getElementById("servicio").value = r.servicio || "";
-    document.getElementById("comentario").value = r.comentario || "";
+  const d = parseInt(parts[0],10);
+  const m = parseInt(parts[1],10) - 1;
+  const y = parseInt(parts[2],10);
 
-    const picker = document.getElementById("fecha_picker");
-    const hidden = document.getElementById("fecha_hidden");
-    hidden.value = r.fecha || hidden.value;
-    const iso = ddmmyyyyToDateValue(hidden.value);
-    if(iso) picker.value = iso;
-
-    updateRetouch();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const fecha = new Date(y, m, d);
+  if(isNaN(fecha.getTime())){
+    document.getElementById("retoque").value = "";
+    return;
   }
+
+  const dias = (servicio === "RETOQUE") ? 365 : 21;
+
+  fecha.setDate(fecha.getDate() + dias);
+
+  const dd = String(fecha.getDate()).padStart(2,"0");
+  const mm = String(fecha.getMonth()+1).padStart(2,"0");
+  const yy = fecha.getFullYear();
+
+  document.getElementById("retoque").value = ${dd}/${mm}/${yy};
+}
 
   function clearForm(){
     document.getElementById("rid").value = "";
