@@ -553,6 +553,7 @@ function computeRetouchFromHidden(servicio){
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js?v=12").catch(()=>{});
   }
+alert("JS NUEVO CARGADO ✅");
 </script>
 </body>
 </html>
