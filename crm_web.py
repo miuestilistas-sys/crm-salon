@@ -273,8 +273,13 @@ HTML = r"""
       <div class="grid3" style="margin-top:10px;">
         <div>
           <label>FECHA (calendario)</label>
-          <input type="hidden" name="fecha" id="fecha_hidden" value="{{ today_ddmmyyyy }}">
-          <input id="fecha_picker" type="date" value="{{ today_iso }}" autocomplete="off">
+<input type="hidden" name="fecha" id="fecha_hidden" value="{{ today_ddmmyy }}">
+
+<input id="fecha_picker"
+       type="date"
+       value="{{ today_iso }}"
+       onchange="syncDate()"
+       autocomplete="off">
         </div>
 
         <div>
