@@ -774,5 +774,5 @@ def export():
     return send_file(EXPORT_FILE, as_attachment=True, download_name=EXPORT_FILE)
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     APP.run(host="0.0.0.0", port=5000, debug=True)
