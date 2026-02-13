@@ -18,7 +18,7 @@ if SUPABASE_URL and SUPABASE_KEY:
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-APP = Flask(_name_)
+APP = Flask(__name__)
 
 # ---------------- Supabase config ----------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
