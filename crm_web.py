@@ -60,9 +60,9 @@ def is_retouch_service(service: str) -> bool:
     return service.strip().upper() == "RETOQUE"
 
 
-def compute_retouch_date(fecha_str: str, service: str) -> str:
-    dt = parse_ddmmyyyy(fecha_str)
-    days = 365 if is_retouch_service(service) else 20
+def compute_retouch_date(fecha_str_ddmmyyyy: str, service: str) -> str:
+    dt = parse_ddmmyyyy(fecha_str_ddmmyyyy)
+    days = 365 if is_retouch_service(service) else 21
     return fmt_ddmmyyyy(dt + timedelta(days=days))
 
 
@@ -76,30 +76,44 @@ def is_due(retouch_str: str) -> bool:
 
 # ---------- Supabase: datos ----------
 def load_data():
-    """Trae todos los registros desde Supabase."""
     try:
         res = (
             SUPABASE.table(CRM_TABLE)
             .select("id,nombre,telefono,fecha,servicio,comentario,recordatorio")
-            .order("created_at", desc=True)
+            .order("id", desc=True)   # o "fecha" si tu fecha está bien
             .execute()
         )
+
         data = res.data or []
         out = []
+
         for r in data:
+            fecha_raw = (r.get("fecha") or "").strip()
+
+            # si viene ISO YYYY-MM-DD -> pasarlo a DD/MM/YYYY
+            if fecha_raw and "-" in fecha_raw:
+                try:
+                    fecha_ui = datetime.strptime(fecha_raw, "%Y-%m-%d").strftime("%d/%m/%Y")
+                except Exception:
+                    fecha_ui = fecha_raw
+            else:
+                fecha_ui = fecha_raw
+
             out.append(
                 {
                     "id": str(r.get("id") or uuid.uuid4()),
                     "nombre": (r.get("nombre") or "").strip(),
                     "telefono": (r.get("telefono") or "").strip(),
-                    "fecha": (r.get("fecha") or "").strip(),  # dd/mm/yyyy
+                    "fecha": (fecha_ui or "").strip(),  # DD/MM/YYYY
                     "servicio": (r.get("servicio") or "").strip(),
                     "comentario": (r.get("comentario") or "").strip(),
                     "recordatorio": bool(r.get("recordatorio", False)),
                 }
             )
+
         return out
-    except Exception:
+    except Exception as e:
+        print("load_data error:", e)
         return []
 
 
