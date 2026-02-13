@@ -7,6 +7,13 @@ from datetime import datetime, timedelta
 from flask import Flask, request, redirect, send_file, render_template_string, Response
 
 from supabase import create_client
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
+CRM_TABLE = os.environ.get("CRM_TABLE", "crm_records")
+
+SUPABASE = None
+if SUPABASE_URL and SUPABASE_KEY:
+    SUPABASE = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -597,13 +604,13 @@ def index():
 
 @APP.post("/save")
 def save():
-    data = load_data()
-    before = deepcopy(data)
+    if SUPABASE is None:
+        return "ERROR: Supabase no inicializó. Revisa SUPABASE_URL y SUPABASE_ANON_KEY en Render.", 500
 
     rid = (request.form.get("id") or "").strip()
     nombre = (request.form.get("nombre") or "").strip()
     telefono = (request.form.get("telefono") or "").strip()
-    fecha = (request.form.get("fecha") or "").strip()  # dd/mm/yyyy viene del hidden
+    fecha = (request.form.get("fecha") or "").strip()       # dd/mm/yyyy (tu hidden)
     servicio = (request.form.get("servicio") or "").strip()
     comentario = (request.form.get("comentario") or "").strip()
 
@@ -611,40 +618,25 @@ def save():
     if err:
         return redirect(f"/?error={err}")
 
-    if rid:
-        # update
-        row = {
-            "id": rid,
-            "nombre": nombre,
-            "telefono": telefono,
-            "fecha": fecha,
-            "servicio": servicio,
-            "comentario": comentario,
-        }
-        # conservar recordatorio actual
-        for r in data:
-            if r["id"] == rid:
-                row["recordatorio"] = bool(r.get("recordatorio", False))
-                break
-        else:
-            row["recordatorio"] = False
-        upsert_row(row)
-    else:
-        # insert
-        row = {
-            "id": str(uuid.uuid4()),
-            "nombre": nombre,
-            "telefono": telefono,
-            "fecha": fecha,
-            "servicio": servicio,
-            "comentario": comentario,
-            "recordatorio": False,
-        }
-        upsert_row(row)
+    # id
+    if not rid:
+        rid = str(uuid.uuid4())
 
-    push_undo_snapshot(before)
+    # convertir fecha dd/mm/yyyy -> yyyy-mm-dd (Supabase date)
+    fecha_iso = parse_ddmmyyyy(fecha).strftime("%Y-%m-%d")
+
+    payload = {
+        "id": rid,
+        "nombre": nombre,
+        "telefono": telefono,
+        "fecha": fecha_iso,
+        "servicio": servicio,
+        "comentario": comentario,
+        "recordatorio": False,
+    }
+
+    SUPABASE.table(CRM_TABLE).upsert(payload).execute()
     return redirect("/")
-
 
 @APP.post("/delete")
 def delete():
