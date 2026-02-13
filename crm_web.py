@@ -409,22 +409,66 @@ HTML = r"""
     return ${yy}-${mm}-${dd};
   }
 
-  function computeRetouchFromHidden(servicio){
-    const ddmmyyyy = document.getElementById("fecha_hidden").value.trim();
-    try{
-      const parts = ddmmyyyy.split("/");
-      if(parts.length !== 3) return "";
-      const d = parseInt(parts[0],10), m = parseInt(parts[1],10)-1, y = parseInt(parts[2],10);
+function computeRetouchFromHidden(servicio){
+  const isRet = (servicio || "").trim().toUpperCase() === "RETOQUE";
+  const days = isRet ? 365 : 21;
+
+  // 1) intentamos desde el date picker (YYYY-MM-DD)
+  const pickerVal = (document.getElementById("fecha_picker")?.value || "").trim();
+  if (pickerVal) {
+    const parts = pickerVal.split("-");
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
       const dt = new Date(y, m, d);
-      if(isNaN(dt.getTime())) return "";
-      const isRet = (servicio || "").trim().toUpperCase() === "RETOQUE";
-      const days = isRet ? 365 : 20;
-      dt.setDate(dt.getDate() + days);
-      const dd = String(dt.getDate()).padStart(2,"0");
-      const mm = String(dt.getMonth()+1).padStart(2,"0");
-      const yy = dt.getFullYear();
-      return ${dd}/${mm}/${yy};
-    }catch(e){ return ""; }
+      if (!isNaN(dt.getTime())) {
+        dt.setDate(dt.getDate() + days);
+        const dd = String(dt.getDate()).padStart(2,"0");
+        const mm = String(dt.getMonth()+1).padStart(2,"0");
+        const yy = dt.getFullYear();
+        return ${dd}/${mm}/${yy};
+      }
+    }
+  }
+
+  // 2) fallback: hidden (DD/MM/YYYY o YYYY-MM-DD)
+  const raw = (document.getElementById("fecha_hidden")?.value || "").trim();
+
+  // si viene DD/MM/YYYY
+  if (raw.includes("/")) {
+    const p = raw.split("/");
+    if (p.length === 3) {
+      const d = parseInt(p[0],10), m = parseInt(p[1],10)-1, y = parseInt(p[2],10);
+      const dt = new Date(y, m, d);
+      if (!isNaN(dt.getTime())) {
+        dt.setDate(dt.getDate() + days);
+        const dd = String(dt.getDate()).padStart(2,"0");
+        const mm = String(dt.getMonth()+1).padStart(2,"0");
+        const yy = dt.getFullYear();
+        return ${dd}/${mm}/${yy};
+      }
+    }
+  }
+
+  // si viene YYYY-MM-DD
+  if (raw.includes("-")) {
+    const p = raw.split("-");
+    if (p.length === 3) {
+      const y = parseInt(p[0],10), m = parseInt(p[1],10)-1, d = parseInt(p[2],10);
+      const dt = new Date(y, m, d);
+      if (!isNaN(dt.getTime())) {
+        dt.setDate(dt.getDate() + days);
+        const dd = String(dt.getDate()).padStart(2,"0");
+        const mm = String(dt.getMonth()+1).padStart(2,"0");
+        const yy = dt.getFullYear();
+        return ${dd}/${mm}/${yy};
+      }
+    }
+  }
+
+  return "";
+}
   }
 
   function updateRetouch(){
