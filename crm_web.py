@@ -179,20 +179,24 @@ def pop_undo_snapshot():
 
 def save_row_upsert(rid, nombre, telefono, fecha_ui, servicio, comentario, recordatorio=False):
     """
-    ✅ Guarda en Supabase con fecha en YYYY-MM-DD.
+    Guarda en Supabase con fecha en YYYY-MM-DD.
+    IMPORTANTE: manda None si telefono/comentario vienen vacíos.
     """
     sb = get_sb()
+
     fecha_supa = ui_to_supa_date(fecha_ui)
 
     payload = {
         "id": rid,
-        "nombre": nombre,
-        "telefono": telefono,
-        "fecha": fecha_supa,  # ✅ YYYY-MM-DD
-        "servicio": servicio,
-        "comentario": comentario,
+        "nombre": (nombre or "").strip(),
+        # ✅ si está vacío, manda None (evita error si DB es numeric)
+        "telefono": (telefono.strip() if (telefono or "").strip() else None),
+        "fecha": fecha_supa,  # YYYY-MM-DD
+        "servicio": (servicio or "").strip(),
+        "comentario": (comentario.strip() if (comentario or "").strip() else None),
         "recordatorio": bool(recordatorio),
     }
+
     sb.table(CRM_TABLE).upsert(payload).execute()
 
 
@@ -645,13 +649,20 @@ def save():
     rid = (request.form.get("id") or "").strip()
     nombre = (request.form.get("nombre") or "").strip()
     telefono = (request.form.get("telefono") or "").strip()
-    fecha = (request.form.get("fecha") or "").strip()   # DD/MM/YYYY (hidden)
+    fecha = (request.form.get("fecha") or "").strip()   # DD/MM/YYYY
     servicio = (request.form.get("servicio") or "").strip()
     comentario = (request.form.get("comentario") or "").strip()
 
     err = validate_row(nombre, fecha, servicio)
     if err:
         return redirect(f"/?error={err}")
+
+    # ✅ Si viene rid pero NO es UUID válido, lo tratamos como nuevo
+    if rid:
+        try:
+            uuid.UUID(rid)
+        except Exception:
+            rid = ""
 
     recordatorio_actual = False
     if rid:
@@ -663,15 +674,22 @@ def save():
         rid = str(uuid.uuid4())
 
     push_undo_snapshot(before)
-    save_row_upsert(
-        rid=rid,
-        nombre=nombre,
-        telefono=telefono,
-        fecha_ui=fecha,  # ✅ se convierte a supabase dentro
-        servicio=servicio,
-        comentario=comentario,
-        recordatorio=recordatorio_actual
-    )
+
+    try:
+        save_row_upsert(
+            rid=rid,
+            nombre=nombre,
+            telefono=telefono,
+            fecha_ui=fecha,
+            servicio=servicio,
+            comentario=comentario,
+            recordatorio=recordatorio_actual
+        )
+    except Exception as e:
+        # ✅ en vez de 500 silencioso, te muestra el error REAL
+        msg = str(e).replace("\n", " ")
+        return redirect(f"/?error=Supabase error: {msg}")
+
     return redirect("/")
 
 
