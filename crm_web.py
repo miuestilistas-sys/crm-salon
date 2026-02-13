@@ -29,23 +29,28 @@ SERVICES = [
 COLUMNS_XLSX = ["NOMBRE", "TELEFONO", "FECHA", "FECHA RETOQUE", "SERVICIO", "COMENTARIO"]
 
 CRM_TABLE = "crm_records"
-UNDO_TABLE = "crm_undo_snapshots"  # la creamos también (opcional pero recomendado)
+UNDO_TABLE = "crm_undo_snapshots"  # tabla para snapshots undo (opcional)
 
 
 # ---------- fechas ----------
 def parse_ddmmyyyy(s: str):
     return datetime.strptime(s.strip(), "%d/%m/%Y")
 
+
 def fmt_ddmmyyyy(dt: datetime):
     return dt.strftime("%d/%m/%Y")
 
+
 def is_retouch_service(service: str) -> bool:
-    return service.strip().upper() == "RETOQUE"
+    return (service or "").strip().upper() == "RETOQUE"
+
 
 def compute_retouch_date(fecha_str: str, service: str) -> str:
     dt = parse_ddmmyyyy(fecha_str)
-    days = 365 if is_retouch_service(service) else 20
+    # ✅ 21 días para todos, 365 para RETOQUE
+    days = 365 if is_retouch_service(service) else 21
     return fmt_ddmmyyyy(dt + timedelta(days=days))
+
 
 def is_due(retouch_str: str) -> bool:
     try:
@@ -57,11 +62,46 @@ def is_due(retouch_str: str) -> bool:
 
 # ---------- Supabase client ----------
 def get_sb() -> Client:
-    url = os.environ.get("SUPABASE_URL", "").strip()
-    key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+    url = (os.environ.get("SUPABASE_URL") or "").strip()
+    key = (os.environ.get("SUPABASE_ANON_KEY") or "").strip()
     if not url or not key:
         raise RuntimeError("Falta SUPABASE_URL o SUPABASE_ANON_KEY en Environment Variables (Render).")
     return create_client(url, key)
+
+
+# ---------- helpers fecha: supabase <-> UI ----------
+def supa_to_ui_date(fecha_raw: str) -> str:
+    """
+    Convierte fecha de Supabase (YYYY-MM-DD) a UI (DD/MM/YYYY).
+    Si ya está en DD/MM/YYYY, la deja igual.
+    """
+    s = (fecha_raw or "").strip()
+    if not s:
+        return ""
+    # ya UI
+    if "/" in s:
+        return s
+    # supabase
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except Exception:
+        return s
+
+
+def ui_to_supa_date(fecha_ui: str) -> str:
+    """
+    Convierte fecha de UI (DD/MM/YYYY) a Supabase (YYYY-MM-DD).
+    Si ya está en YYYY-MM-DD, la deja igual.
+    """
+    s = (fecha_ui or "").strip()
+    if not s:
+        return ""
+    if "-" in s:
+        return s
+    try:
+        return datetime.strptime(s, "%d/%m/%Y").strftime("%Y-%m-%d")
+    except Exception:
+        return s
 
 
 # ---------- persistencia (Supabase) ----------
@@ -69,17 +109,19 @@ def load_data(q: str = ""):
     sb = get_sb()
     q = (q or "").strip()
 
-    # Traemos todo (ordenado), y filtramos por nombre si hay q (más simple y estable)
     resp = sb.table(CRM_TABLE).select("*").order("created_at", desc=True).execute()
     rows = resp.data or []
 
     out = []
     for r in rows:
+        fecha_raw = (r.get("fecha") or "").strip()
+        fecha_ui = supa_to_ui_date(fecha_raw)  # ✅ CONVERSIÓN CLAVE
+
         out.append({
             "id": str(r.get("id") or ""),
             "nombre": (r.get("nombre") or "").strip(),
             "telefono": (r.get("telefono") or "").strip(),
-            "fecha": (r.get("fecha") or "").strip(),
+            "fecha": fecha_ui,  # ✅ SIEMPRE DD/MM/YYYY para la app
             "servicio": (r.get("servicio") or "").strip(),
             "comentario": (r.get("comentario") or "").strip(),
             "recordatorio": bool(r.get("recordatorio", False)),
@@ -100,11 +142,8 @@ def push_undo_snapshot(before_rows):
     """
     try:
         sb = get_sb()
-        sb.table(UNDO_TABLE).insert({
-            "snapshot": before_rows
-        }).execute()
+        sb.table(UNDO_TABLE).insert({"snapshot": before_rows}).execute()
 
-        # Mantener solo los últimos UNDO_MAX
         resp = sb.table(UNDO_TABLE).select("id").order("id", desc=True).execute()
         ids = [r["id"] for r in (resp.data or [])]
         if len(ids) > UNDO_MAX:
@@ -138,13 +177,18 @@ def pop_undo_snapshot():
         return None
 
 
-def save_row_upsert(rid, nombre, telefono, fecha, servicio, comentario, recordatorio=False):
+def save_row_upsert(rid, nombre, telefono, fecha_ui, servicio, comentario, recordatorio=False):
+    """
+    ✅ Guarda en Supabase con fecha en YYYY-MM-DD.
+    """
     sb = get_sb()
+    fecha_supa = ui_to_supa_date(fecha_ui)
+
     payload = {
         "id": rid,
         "nombre": nombre,
         "telefono": telefono,
-        "fecha": fecha,
+        "fecha": fecha_supa,  # ✅ YYYY-MM-DD
         "servicio": servicio,
         "comentario": comentario,
         "recordatorio": bool(recordatorio),
@@ -165,12 +209,12 @@ def set_recordatorio(rid, want: bool):
 def replace_all_rows(rows):
     """
     Restaura todo a un snapshot (para Undo).
+    OJO: snapshot trae fecha en DD/MM/YYYY (por nuestra app), aquí la convertimos al guardar.
     """
     sb = get_sb()
-    # Borra todo
+
     sb.table(CRM_TABLE).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
 
-    # Inserta todo
     if rows:
         ins = []
         for r in rows:
@@ -178,7 +222,7 @@ def replace_all_rows(rows):
                 "id": r.get("id") or str(uuid.uuid4()),
                 "nombre": r.get("nombre", ""),
                 "telefono": r.get("telefono", ""),
-                "fecha": r.get("fecha", ""),
+                "fecha": ui_to_supa_date(r.get("fecha", "")),  # ✅ convertir
                 "servicio": r.get("servicio", ""),
                 "comentario": r.get("comentario", ""),
                 "recordatorio": bool(r.get("recordatorio", False)),
@@ -243,7 +287,6 @@ HTML = r"""
     .chk { width: 22px; height: 22px; accent-color: #16a34a; cursor: pointer; }
     .chkWrap { display:flex; justify-content:center; align-items:center; }
 
-    /* ✅ Scroll de tabla para ver TODOS */
     .tableWrap{
       overflow:auto;
       max-height: 58vh;
@@ -441,7 +484,7 @@ HTML = r"""
       const dt = new Date(y, m, d);
       if(isNaN(dt.getTime())) return "";
       const isRet = (servicio || "").trim().toUpperCase() === "RETOQUE";
-      const days = isRet ? 365 : 20;
+      const days = isRet ? 365 : 21; // ✅ 21 para todos, 365 si RETOQUE
       dt.setDate(dt.getDate() + days);
       const dd = String(dt.getDate()).padStart(2,"0");
       const mm = String(dt.getMonth()+1).padStart(2,"0");
@@ -493,7 +536,6 @@ HTML = r"""
     updateRetouch();
   }
 
-  // ✅ Checkbox recordatorio (con confirm) y target correcto
   function confirmReminder(chk){
     const form = chk.closest("form");
     const targetInput = form.querySelector('input[name="target"]');
@@ -508,11 +550,10 @@ HTML = r"""
     if(ok){
       form.submit();
     } else {
-      chk.checked = !chk.checked; // revierte visualmente
+      chk.checked = !chk.checked;
     }
   }
 
-  // ✅ Filtro EN VIVO (sin recargar página)
   function applyFilterLive(){
     const q = (document.getElementById("q").value || "").trim().toLowerCase();
     const tbody = document.getElementById("tbodyRows");
@@ -522,9 +563,7 @@ HTML = r"""
     let total = 0;
 
     for(const tr of trs){
-      // ignora fila "No hay resultados"
       if(tr.children.length < 2) continue;
-
       total += 1;
       const hay = (tr.getAttribute("data-search") || "");
       const ok = !q || hay.includes(q);
@@ -532,8 +571,7 @@ HTML = r"""
       if(ok) shown += 1;
     }
 
-    const info = document.getElementById("countInfo");
-    info.textContent = `Mostrando ${shown} de ${total} registros`;
+    document.getElementById("countInfo").textContent = `Mostrando ${shown} de ${total} registros`;
   }
 
   document.getElementById("q").addEventListener("input", applyFilterLive);
@@ -550,7 +588,6 @@ HTML = r"""
 
 @APP.get("/")
 def index():
-    # Ya no usamos filtro por URL para evitar que el teclado “se corte” en tablet.
     data = load_data()
 
     rows = []
@@ -608,7 +645,7 @@ def save():
     rid = (request.form.get("id") or "").strip()
     nombre = (request.form.get("nombre") or "").strip()
     telefono = (request.form.get("telefono") or "").strip()
-    fecha = (request.form.get("fecha") or "").strip()
+    fecha = (request.form.get("fecha") or "").strip()   # DD/MM/YYYY (hidden)
     servicio = (request.form.get("servicio") or "").strip()
     comentario = (request.form.get("comentario") or "").strip()
 
@@ -616,7 +653,6 @@ def save():
     if err:
         return redirect(f"/?error={err}")
 
-    # Si es update, conservamos recordatorio actual
     recordatorio_actual = False
     if rid:
         for r in data:
@@ -631,7 +667,7 @@ def save():
         rid=rid,
         nombre=nombre,
         telefono=telefono,
-        fecha=fecha,
+        fecha_ui=fecha,  # ✅ se convierte a supabase dentro
         servicio=servicio,
         comentario=comentario,
         recordatorio=recordatorio_actual
@@ -658,7 +694,7 @@ def toggle_reminder():
     before = deepcopy(data)
 
     rid = (request.form.get("id") or "").strip()
-    target = (request.form.get("target") or "").strip()  # "1" marcar, "0" desmarcar
+    target = (request.form.get("target") or "").strip()
     want = True if target == "1" else False
 
     if rid:
